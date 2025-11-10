@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - UpScale Marketing Solutions</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .privacy-hero {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            padding: 60px 0 80px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .privacy-hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="%23ffffff" opacity="0.1"/></pattern></defs><rect width="100%" height="100%" fill="url(%23grain)"/></svg>');
+            pointer-events: none;
+        }
+
+        .privacy-hero .hero-content {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        .privacy-icon {
+            font-size: clamp(3rem, 6vw, 4rem);
+            margin-bottom: 24px;
+            display: block;
+            filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.3));
+        }
+
+        .privacy-title {
+            font-family: 'Playfair Display', serif;
+            color: white;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .privacy-title-main {
+            display: block;
+            font-size: clamp(2rem, 5vw, 3rem);
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .privacy-content {
+            flex: 1;
+            padding: 60px 0;
+            background: #f8fafc;
+        }
+
+        .privacy-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e2e8f0;
+        }
+
+        .privacy-section {
+            margin-bottom: 40px;
+        }
+
+        .privacy-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .section-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f59e0b;
+        }
+
+        .privacy-text {
+            color: #475569;
+            line-height: 1.7;
+            margin-bottom: 16px;
+            font-size: 16px;
+        }
+
+        .privacy-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+
+        .privacy-list li {
+            color: #475569;
+            line-height: 1.7;
+            margin-bottom: 12px;
+            padding-left: 24px;
+            position: relative;
+        }
+
+        .privacy-list li::before {
+            content: '•';
+            color: #f59e0b;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 1px solid #f59e0b;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 24px 0;
+        }
+
+        .highlight-box .highlight-title {
+            font-weight: 600;
+            color: #92400e;
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+        }
+
+        .highlight-box .highlight-text {
+            color: #92400e;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #f59e0b;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .back-btn:hover {
+            background: #d97706;
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 768px) {
+            .privacy-card {
+                padding: 24px 20px;
+                margin: 20px 0;
+            }
+            
+            .privacy-content {
+                padding: 40px 0;
+            }
+            
+            .section-title {
+                font-size: 1.3rem;
+            }
+
+            .highlight-box {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-wrapper">
+        <!-- Privacy Hero Section -->
+        <header class="privacy-hero">
+            <div class="hero-content">
+                <div class="privacy-icon">🔒</div>
+                <h1 class="privacy-title">
+                    <span class="privacy-title-main">Privacy Policy</span>
+                </h1>
+                <p style="color: #cbd5e1; font-size: 18px;">UpScale Marketing Solutions Privacy Statement</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="privacy-content">
+            <div class="container">
+                <div class="privacy-card">
+                    <div class="privacy-section">
+                        <h2 class="section-title">Our Commitment to Your Privacy</h2>
+                        <p class="privacy-text">
+                            We respect your privacy and are committed to protecting your personal data. The personal information we collect allows us to support your account and run your promotion campaigns. We guarantee that we only use the information for supporting your account and running your promotion campaigns.
+                        </p>
+                    </div>
+
+                    <div class="privacy-section">
+                        <h2 class="section-title">Information We Collect and How We Use It</h2>
+                        <p class="privacy-text">
+                            Below is the list of information we collect about you, your devices and your videos:
+                        </p>
+                        <ul class="privacy-list">
+                            <li>Your name</li>
+                            <li>Your email address</li>
+                            <li>Your phone number</li>
+                            <li>When you create a promotion campaign we save the URL of the video/videos you have entered, and URL of the YouTube channel you have entered or we found using the video's URL</li>
+                            <li>We collect the public information about your YouTube video (its title, number of views, likes, dislikes, comments, the length of the video)</li>
+                            <li>YouTube channel information (its URL, number of subscribers)</li>
+                        </ul>
+                    </div>
+
+                    <div class="privacy-section">
+                        <h2 class="section-title">Information Sharing and Protection</h2>
+                        <p class="privacy-text">
+                            We don't share the information you provide us with anyone else without your consent.
+                        </p>
+                        
+                        <div class="highlight-box">
+                            <div class="highlight-title">🔐 Your Data Security</div>
+                            <p class="highlight-text">
+                                The information is stored in secure servers. We follow strict security procedures in the storage and disclosure of your personal data, and to protect it against accidental loss, destruction or damage.
+                            </p>
+                        </div>
+
+                        <p class="privacy-text">
+                            The data you provide to us is protected using SSL (Secure Socket Layer) technology. SSL is the industry standard method of encrypting personal information and credit card details so that they can be securely transferred over the Internet.
+                        </p>
+                    </div>
+
+                    <div class="privacy-section">
+                        <h2 class="section-title">Data Access and Management</h2>
+                        <p class="privacy-text">
+                            Only our employees and web developers have access to your data. And only to the data which is necessary for their job. For example, your support manager will have access to your contact data such as your email address and the list of your videos.
+                        </p>
+                    </div>
+
+                    <div class="privacy-section">
+                        <h2 class="section-title">Age Restrictions</h2>
+                        <p class="privacy-text">
+                            We do not allow users under the age of 18 to use our services. We do not knowingly collect any personal information from anyone who is under the age of 18.
+                        </p>
+                    </div>
+
+                    <div class="privacy-section">
+                        <h2 class="section-title">Contact Information</h2>
+                        <p class="privacy-text">
+                            If you have any questions about this Privacy Policy or how we handle your personal information, please contact us through our website at <a href="https://upscalemarketingsolutions.com" style="color: #f59e0b; text-decoration: underline;">https://upscalemarketingsolutions.com</a>.
+                        </p>
+                    </div>
+
+                    <a href="/index.html" class="back-btn">
+                        <span>←</span>
+                        <span>Back to Home</span>
+                    </a>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="container">
+                <p class="footer-text">&copy; 2025 Upscale Marketing Solutions. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Successful - YouTube Promotion Services</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Loading Overlay Styles */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(245, 158, 11, 0.2);
+            border-top: 3px solid #f59e0b;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 24px;
+        }
+
+        .loading-message {
+            color: white;
+            font-size: 18px;
+            font-weight: 500;
+            text-align: center;
+            max-width: 300px;
+            line-height: 1.5;
+        }
+
+        .loading-subtitle {
+            color: #cbd5e1;
+            font-size: 14px;
+            margin-top: 8px;
+            opacity: 0.8;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Hide main content initially */
+        .main-wrapper {
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .main-wrapper.loaded {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-message">
+            Please wait...<br>
+            <span class="loading-subtitle">Fetching your order details</span>
+        </div>
+    </div>
+
+    <div class="main-wrapper" id="mainWrapper">
+        <!-- Success Hero Section -->
+        <header class="success-hero">
+            <div class="hero-content">
+                <div class="success-icon">✅</div>
+                <h1 class="success-title">
+                    <span class="success-title-main">Payment Successful!</span>
+                    <span class="success-title-sub">Your YouTube promotion is ready to launch</span>
+                </h1>
+                <p class="success-description">
+                    Thank you for choosing our premium YouTube promotion services. Your payment has been processed successfully and our team is already preparing your customized growth campaign.
+                </p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="success-content">
+            <div class="container">
+                
+                <!-- Order Summary Card -->
+                <section class="order-summary-card">
+                    <div class="card-header">
+                        <h2 class="section-title">Order Confirmation</h2>
+                        <p class="section-subtitle">Your purchase details and confirmation</p>
+                    </div>
+                    
+                    <div class="order-details" id="orderDetails">
+                        <div class="detail-row">
+                            <span class="detail-label">Order ID</span>
+                            <span class="detail-value" id="orderIdDisplay">Loading...</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Purchase Date</span>
+                            <span class="detail-value" id="orderDate">Loading...</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Service</span>
+                            <span class="detail-value">YouTube Promotion Package</span>
+                        </div>
+                        <div class="detail-row total-row">
+                            <span class="detail-label">Amount Paid</span>
+                            <span class="detail-value total-amount" id="amountPaid">Loading...</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Timeline Card -->
+                <section class="timeline-card">
+                    <div class="card-header">
+                        <h2 class="section-title">What Happens Next</h2>
+                        <p class="section-subtitle">Your promotion timeline and what to expect</p>
+                    </div>
+                    
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-icon">🔍</div>
+                            <div class="timeline-content">
+                                <h3 class="timeline-title">Content Review</h3>
+                                <p class="timeline-time">Within 2 hours</p>
+                                <p class="timeline-description">Our team will analyze your YouTube content and create a customized promotion strategy tailored to your audience.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="timeline-item">
+                            <div class="timeline-icon">🚀</div>
+                            <div class="timeline-content">
+                                <h3 class="timeline-title">Campaign Launch</h3>
+                                <p class="timeline-time">Within 24 hours</p>
+                                <p class="timeline-description">We'll begin implementing your promotion campaign across our premium network to maximize your reach and engagement.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="timeline-item">
+                            <div class="timeline-icon">📈</div>
+                            <div class="timeline-content">
+                                <h3 class="timeline-title">Growth Tracking</h3>
+                                <p class="timeline-time">Ongoing</p>
+                                <p class="timeline-description">Watch as your channel gains increased views, engagement, and subscribers with real-time growth monitoring.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="timeline-item">
+                            <div class="timeline-icon">📊</div>
+                            <div class="timeline-content">
+                                <h3 class="timeline-title">Progress Reports</h3>
+                                <p class="timeline-time">Weekly updates</p>
+                                <p class="timeline-description">Receive detailed analytics and progress reports to track your channel's growth and campaign performance.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Action Card -->
+                <section class="action-card">
+                    <div class="card-header">
+                        <h2 class="section-title">Next Steps</h2>
+                        <p class="section-subtitle">Continue your YouTube growth journey</p>
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <a href="/index.html" class="action-btn primary-btn">
+                            <span class="btn-icon">🏠</span>
+                            <span class="btn-text">Return Home</span>
+                        </a>
+                        <a href="mailto:support@upscalemarketingsolutions.com" class="action-btn secondary-btn">
+                            <span class="btn-icon">📧</span>
+                            <span class="btn-text">Contact Support</span>
+                        </a>
+                    </div>
+                    
+                    <div class="support-info">
+                        <div class="support-card">
+                            <h3 class="support-title">Need Assistance?</h3>
+                            <p class="support-description">Our dedicated support team is here to help with any questions about your promotion campaign.</p>
+                            <div class="support-contact">
+                                <p><strong>Email:</strong> <a href="mailto:support@upscalemarketingsolutions.com">support@upscalemarketingsolutions.com</a></p>
+                                <p><strong>Response Time:</strong> Within 2-4 hours during business hours</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="container">
+                <p class="footer-text">&copy; 2025 Upscale Marketing Solutions. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Get order ID and amount from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderId = urlParams.get('order');
+        const amount = urlParams.get('amount');
+        
+        // Function to hide loading overlay and show main content
+        function hideLoadingOverlay() {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const mainWrapper = document.getElementById('mainWrapper');
+            
+            loadingOverlay.classList.add('hidden');
+            mainWrapper.classList.add('loaded');
+        }
+        
+        // Function to fetch order details from server
+        async function fetchOrderDetails(orderId) {
+            try {
+                const response = await fetch(`/api/get-order?orderId=${orderId}`);
+                const data = await response.json();
+                
+                if (data.success && data.order) {
+                    document.getElementById('amountPaid').textContent = `$${data.order.amount}`;
+                } else {
+                    document.getElementById('amountPaid').textContent = 'Payment completed';
+                }
+            } catch (error) {
+                console.error('Error fetching order details:', error);
+                document.getElementById('amountPaid').textContent = 'Payment completed';
+            } finally {
+                // Hide loading overlay after fetching is complete
+                hideLoadingOverlay();
+            }
+        }
+        
+        // Initialize page
+        async function initializePage() {
+            // Display order information
+            if (orderId) {
+                document.getElementById('orderIdDisplay').textContent = orderId;
+            } else {
+                document.getElementById('orderIdDisplay').textContent = 'Order completed successfully';
+            }
+            
+            // Display current date
+            document.getElementById('orderDate').textContent = new Date().toLocaleDateString();
+            
+            // Display amount paid
+            if (amount) {
+                document.getElementById('amountPaid').textContent = `$${amount}`;
+                // If amount is available immediately, hide loading overlay after a brief delay
+                setTimeout(hideLoadingOverlay, 800);
+            } else {
+                // Try to fetch order details from server if amount not in URL
+                if (orderId) {
+                    await fetchOrderDetails(orderId);
+                } else {
+                    document.getElementById('amountPaid').textContent = 'Payment completed';
+                    // Hide loading overlay after a brief delay
+                    setTimeout(hideLoadingOverlay, 800);
+                }
+            }
+        }
+        
+        // Start initialization when page loads
+        document.addEventListener('DOMContentLoaded', initializePage);
+        
+        // Optional: Auto-redirect after a certain time
+        // setTimeout(() => {
+        //     window.location.href = '/';
+        // }, 30000); // Redirect after 30 seconds
+    </script>
+</body>
+</html>

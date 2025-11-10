@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Refund Policy - UpScale Marketing Solutions</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .refund-hero {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            padding: 60px 0 80px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .refund-hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="%23ffffff" opacity="0.1"/></pattern></defs><rect width="100%" height="100%" fill="url(%23grain)"/></svg>');
+            pointer-events: none;
+        }
+
+        .refund-hero .hero-content {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        .refund-icon {
+            font-size: clamp(3rem, 6vw, 4rem);
+            margin-bottom: 24px;
+            display: block;
+            filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.3));
+        }
+
+        .refund-title {
+            font-family: 'Playfair Display', serif;
+            color: white;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+
+        .refund-title-main {
+            display: block;
+            font-size: clamp(2rem, 5vw, 3rem);
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .refund-content {
+            flex: 1;
+            padding: 60px 0;
+            background: #f8fafc;
+        }
+
+        .refund-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e2e8f0;
+        }
+
+        .refund-section {
+            margin-bottom: 40px;
+        }
+
+        .refund-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .section-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #f59e0b;
+        }
+
+        .refund-text {
+            color: #475569;
+            line-height: 1.7;
+            margin-bottom: 16px;
+            font-size: 16px;
+        }
+
+        .refund-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+
+        .refund-list li {
+            color: #475569;
+            line-height: 1.7;
+            margin-bottom: 12px;
+            padding-left: 24px;
+            position: relative;
+        }
+
+        .refund-list li::before {
+            content: '•';
+            color: #f59e0b;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+
+        .policy-notice {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+            border: 1px solid #ef4444;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 24px 0;
+        }
+
+        .policy-notice .notice-title {
+            font-weight: 600;
+            color: #dc2626;
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .policy-notice .notice-text {
+            color: #dc2626;
+            line-height: 1.6;
+            margin: 0;
+            font-weight: 500;
+        }
+
+        .exception-box {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border: 1px solid #22c55e;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 24px 0;
+        }
+
+        .exception-box .exception-title {
+            font-weight: 600;
+            color: #16a34a;
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .exception-list {
+            list-style: none;
+            padding: 0;
+            margin: 16px 0 0;
+        }
+
+        .exception-list li {
+            color: #16a34a;
+            line-height: 1.7;
+            margin-bottom: 12px;
+            padding-left: 24px;
+            position: relative;
+        }
+
+        .exception-list li::before {
+            content: '✓';
+            color: #22c55e;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #f59e0b;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .back-btn:hover {
+            background: #d97706;
+            transform: translateY(-2px);
+        }
+
+        @media (max-width: 768px) {
+            .refund-card {
+                padding: 24px 20px;
+                margin: 20px 0;
+            }
+            
+            .refund-content {
+                padding: 40px 0;
+            }
+            
+            .section-title {
+                font-size: 1.3rem;
+            }
+
+            .policy-notice, .exception-box {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-wrapper">
+        <!-- Refund Hero Section -->
+        <header class="refund-hero">
+            <div class="hero-content">
+                <div class="refund-icon">💰</div>
+                <h1 class="refund-title">
+                    <span class="refund-title-main">Refund Policy</span>
+                </h1>
+                <p style="color: #cbd5e1; font-size: 18px;">UpScale Marketing Solutions Refund Terms</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="refund-content">
+            <div class="container">
+                <div class="refund-card">
+                    <div class="refund-section">
+                        <h2 class="section-title">General Refund Policy</h2>
+                        
+                        <div class="policy-notice">
+                            <div class="notice-title">
+                                <span>⚠️</span>
+                                <span>Important Notice</span>
+                            </div>
+                            <p class="notice-text">
+                                ALL PURCHASES ARE FINAL AND NON-REFUNDABLE
+                            </p>
+                        </div>
+
+                        <p class="refund-text">
+                            This policy applies to all advertising services and campaigns purchased through UpScale Marketing Solutions. Once payment has been processed and advertising services have begun, refunds are generally not available.
+                        </p>
+                    </div>
+
+                    <div class="refund-section">
+                        <h2 class="section-title">Refund Exceptions</h2>
+                        <p class="refund-text">
+                            While our general policy is that all purchases are final, we do provide refunds of the unspent balance in the following specific circumstances:
+                        </p>
+
+                        <div class="exception-box">
+                            <div class="exception-title">
+                                <span>✅</span>
+                                <span>Eligible Refund Cases</span>
+                            </div>
+                            <ul class="exception-list">
+                                <li>If UpScale Marketing Solutions refuses to provide advertising services to the client for any reason, the advertising budget will be returned to the client in full.</li>
+                                <li>If Google Ads does not approve the video for advertising, the advertising budget can be returned to the client in full, or the client can provide another video for the promotion instead.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="refund-section">
+                        <h2 class="section-title">Payment and Currency Information</h2>
+                        <p class="refund-text">
+                            Charges associated with your purchases will appear on your active credit/debit card statement. All prices displayed on the Site are in US dollars and are payable in US dollars.
+                        </p>
+                        <p class="refund-text">
+                            Any eligible refunds will be processed back to the original payment method used for the purchase within 30 business days of approval.
+                        </p>
+                    </div>
+
+                    <div class="refund-section">
+                        <h2 class="section-title">How to Request a Refund</h2>
+                        <p class="refund-text">
+                            If you believe your situation qualifies for a refund under our exception policy, please contact our support team through our website at <a href="https://upscalemarketingsolutions.com" style="color: #f59e0b; text-decoration: underline;">https://upscalemarketingsolutions.com</a> with the following information:
+                        </p>
+                        <ul class="refund-list">
+                            <li>Your account information and campaign details</li>
+                            <li>The specific reason for your refund request</li>
+                            <li>Any supporting documentation or correspondence</li>
+                            <li>Your preferred contact method for follow-up</li>
+                        </ul>
+                        <p class="refund-text">
+                            Our team will review your request and respond within 5 business days to inform you of the approval or denial of your refund request.
+                        </p>
+                    </div>
+
+                    <a href="/index.html" class="back-btn">
+                        <span>←</span>
+                        <span>Back to Home</span>
+                    </a>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="container">
+                <p class="footer-text">&copy; 2025 Upscale Marketing Solutions. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

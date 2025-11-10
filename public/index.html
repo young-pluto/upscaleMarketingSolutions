@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Promotion Services - Upscale Marketing Solutions</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <!-- <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-message">
+            Please wait...<br>
+            <span class="loading-subtitle">Fetching your order details</span>
+        </div>
+    </div> -->
+
+    <!-- Full Page Payment Loading Overlay -->
+    <div id="fullPagePaymentOverlay" class="full-page-payment-overlay hidden">
+        <div class="full-page-spinner"></div>
+        <div class="full-page-message">
+            <div class="full-page-title">Processing Payment...</div>
+            <div class="full-page-subtitle">Please wait while we complete your transaction</div>
+        </div>
+    </div>
+
+    <div class="main-wrapper" id="mainWrapper">
+        <!-- Hero Section -->
+        <header class="hero-section">
+            <div class="hero-content">
+                <div class="hero-badge">Premium Growth Solutions</div>
+                <h1 class="hero-title">
+                    <span class="hero-title-main">YouTube Promotion</span>
+                    <span class="hero-title-sub">that Delivers Results</span>
+                </h1>
+                <p class="hero-description">Professional YouTube growth services designed to amplify your content reach and engagement with authentic, high-quality promotion campaigns.</p>
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <div class="stat-number">10K+</div>
+                        <div class="stat-label">Videos Promoted</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">50M+</div>
+                        <div class="stat-label">Viewers Reached</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">98%</div>
+                        <div class="stat-label">Client Satisfaction</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="container">
+                
+                <!-- Step Progress Indicator -->
+                <div class="step-progress">
+                    <div class="step-item active" data-step="1">
+                        <div class="step-circle">1</div>
+                        <div class="step-label" data-step="1">Choose Package</div>
+                    </div>
+                    <div class="step-item" data-step="2">
+                        <div class="step-circle">2</div>
+                        <div class="step-label" data-step="2">Campaign Details</div>
+                    </div>
+                    <div class="step-item" data-step="3">
+                        <div class="step-circle">3</div>
+                        <div class="step-label" data-step="3">Your Information</div>
+                    </div>
+                    <div class="step-item" data-step="4">
+                        <div class="step-circle">4</div>
+                        <div class="step-label" data-step="4">Complete Order</div>
+                    </div>
+                </div>
+
+                <!-- Step 1: Package Selection -->
+                <section class="step-section active" id="step1">
+                    <div class="step-card">
+                        <div class="step-header">
+                            <h2 class="section-title">Choose Your Investment</h2>
+                            <p class="section-subtitle">Select the promotion package that fits your goals</p>
+                        </div>
+
+                        <!-- Amount Selector -->
+                        <div class="amount-selector">
+                            <div class="amount-display-wrapper">
+                                <div class="amount-display">
+                                    <span class="currency">$</span>
+                                    <span id="selectedAmount">10</span>
+                                </div>
+                                <div class="amount-label">Investment Amount</div>
+                            </div>
+                            
+                            <div class="slider-container">
+                                <input type="range" id="amountSlider" min="10" max="200" step="5" value="10" class="amount-slider">
+                                <div class="slider-labels">
+                                    <span class="slider-min">$10</span>
+                                    <span class="slider-max">$200</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Quick Select Buttons -->
+                            <div class="quick-select">
+                                <div class="quick-select-label">Popular choices:</div>
+                                <div class="amount-buttons">
+                                    <button class="amount-btn" data-amount="15">$15</button>
+                                    <button class="amount-btn" data-amount="25">$25</button>
+                                    <button class="amount-btn" data-amount="40">$40</button>
+                                    <button class="amount-btn" data-amount="60">$60</button>
+                                    <button class="amount-btn" data-amount="100">$100</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Step Navigation (moved up for better mobile visibility) -->
+                            <div class="step-navigation">
+                                <button class="nav-btn next-btn" id="step1Next">
+                                    <span class="btn-text">Continue</span>
+                                    <span class="btn-icon">→</span>
+                                </button>
+                            </div>
+
+                            <!-- Custom Amount Input - Fixed Mobile Layout -->
+                            <div class="custom-amount">
+                                <label for="customAmount" class="custom-label">Custom Amount ($10 - $500):</label>
+                                <div class="custom-input-group">
+                                    <div class="input-with-currency">
+                                        <span class="currency-symbol">$</span>
+                                        <input type="number" id="customAmount" min="10" max="500" step="1" placeholder="Enter amount">
+                                    </div>
+                                    <button type="button" id="setCustomAmount" class="custom-btn">Set Amount</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Inline Campaign Preview -->
+                        <div class="campaign-preview" id="campaignPreview">
+                            <div class="preview-content">
+                                <div class="preview-icon">📊</div>
+                                <div class="preview-text">
+                                    <p id="previewDescription">Campaign designed to reach approximately 1,000–2,000 fresh viewers</p>
+                                    <button class="preview-expand" id="expandPreview">
+                                        <span class="expand-text">View Details</span>
+                                        <span class="expand-icon">↓</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Expandable Details -->
+                            <div class="preview-details" id="previewDetails" style="display: none;">
+                                <div class="details-grid">
+                                    <div class="detail-item">
+                                        <span class="detail-icon">👁️</span>
+                                        <span class="detail-text">Fresh Viewers</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-icon">👍</span>
+                                        <span class="detail-text">Likes</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-icon">💬</span>
+                                        <span class="detail-text">Comments</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-icon">👥</span>
+                                        <span class="detail-text">Subscribers</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-icon">📤</span>
+                                        <span class="detail-text">Shares</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-icon">📈</span>
+                                        <span class="detail-text">Growth Boost</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 2: Campaign Details -->
+                <section class="step-section" id="step2">
+                    <div class="step-card">
+                        <div class="step-header">
+                            <h2 class="section-title">Campaign Details</h2>
+                            <p class="section-subtitle">Your personalized promotion strategy</p>
+                        </div>
+                        
+                        <div class="campaign-details-full">
+                            <div class="package-summary">
+                                <div class="summary-amount">
+                                    <span class="summary-currency">$</span>
+                                    <span id="summarySelectedAmount">10</span>
+                                </div>
+                                <div class="summary-label">Investment Package</div>
+                            </div>
+                            
+                            <div class="campaign-description">
+                                <p id="fullPackageDescription">Trial package of $10 – a short campaign to test the waters, aiming for 1,000–2,000 fresh viewers with estimated engagement events including likes, comments, subscribers, and shares.</p>
+                            </div>
+
+                            <!-- Step Navigation (moved up for better mobile visibility) -->
+                            <div class="step-navigation">
+                                <button class="nav-btn back-btn" id="step2Back">
+                                    <span class="btn-icon">←</span>
+                                    <span class="btn-text">Back</span>
+                                </button>
+                                <button class="nav-btn next-btn" id="step2Next">
+                                    <span class="btn-text">Continue</span>
+                                    <span class="btn-icon">→</span>
+                                </button>
+                            </div>
+
+                            <div class="engagement-breakdown-full">
+                                <h3 class="engagement-title">What You'll Get:</h3>
+                                <div class="engagement-grid">
+                                    <div class="engagement-card">
+                                        <div class="engagement-icon">👁️</div>
+                                        <div class="engagement-content">
+                                            <h4>Fresh Viewers</h4>
+                                            <p id="viewerRange">1,000 - 2,000</p>
+                                        </div>
+                                    </div>
+                                    <div class="engagement-card">
+                                        <div class="engagement-icon">👍</div>
+                                        <div class="engagement-content">
+                                            <h4>Authentic Likes</h4>
+                                            <p>Quality engagement</p>
+                                        </div>
+                                    </div>
+                                    <div class="engagement-card">
+                                        <div class="engagement-icon">💬</div>
+                                        <div class="engagement-content">
+                                            <h4>Real Comments</h4>
+                                            <p>Meaningful interactions</p>
+                                        </div>
+                                    </div>
+                                    <div class="engagement-card">
+                                        <div class="engagement-icon">👥</div>
+                                        <div class="engagement-content">
+                                            <h4>New Subscribers</h4>
+                                            <p>Growing your audience</p>
+                                        </div>
+                                    </div>
+                                    <div class="engagement-card">
+                                        <div class="engagement-icon">📤</div>
+                                        <div class="engagement-content">
+                                            <h4>Social Shares</h4>
+                                            <p>Extended reach</p>
+                                        </div>
+                                    </div>
+                                    <div class="engagement-card">
+                                        <div class="engagement-icon">📈</div>
+                                        <div class="engagement-content">
+                                            <h4>Algorithm Boost</h4>
+                                            <p>Improved visibility</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 3: User Information -->
+                <section class="step-section" id="step3">
+                    <div class="step-card">
+                        <div class="step-header">
+                            <h2 class="section-title">Your Information</h2>
+                            <p class="section-subtitle">Tell us about your YouTube content</p>
+                        </div>
+                        
+                        <form id="userDetailsForm" class="user-form">
+                            <div class="form-group">
+                                <label for="youtubeLink" class="form-label">YouTube Link <span class="required">*</span></label>
+                                <input type="url" id="youtubeLink" name="youtubeLink" required 
+                                       class="form-input" placeholder="https://youtube.com/watch?v=... or channel URL">
+                                <small class="form-hint">Paste your YouTube video or channel link here</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="fullName" class="form-label">Full Name</label>
+                                <input type="text" id="fullName" name="fullName" 
+                                       class="form-input" placeholder="Your full name (optional)">
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="email" class="form-label">Email Address</label>
+                                    <input type="email" id="email" name="email" 
+                                           class="form-input" placeholder="your@email.com">
+                                </div>
+                                <div class="form-group">
+                                    <label for="phone" class="form-label">Phone Number</label>
+                                    <input type="tel" id="phone" name="phone" 
+                                           class="form-input" placeholder="+1 (555) 123-4567">
+                                </div>
+                            </div>
+                            <small class="contact-note">* Please provide either email or phone number</small>
+                        </form>
+
+                        <!-- Step Navigation -->
+                        <div class="step-navigation">
+                            <button class="nav-btn back-btn" id="step3Back">
+                                <span class="btn-icon">←</span>
+                                <span class="btn-text">Back</span>
+                            </button>
+                            <button class="nav-btn next-btn" id="step3Next">
+                                <span class="btn-text">Complete Order</span>
+                                <span class="btn-icon">→</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 4: Payment -->
+                <section class="step-section" id="step4">
+                    <div class="step-card">
+                        <div class="step-header">
+                            <h2 class="section-title">Complete Your Order</h2>
+                            <p class="section-subtitle">Secure payment to start your campaign</p>
+                        </div>
+                        
+                        <div class="order-summary">
+                            <div class="summary-row">
+                                <span class="summary-label">YouTube Promotion Package</span>
+                                <span id="summaryAmount" class="summary-amount">$10.00</span>
+                            </div>
+                            <div class="summary-row total">
+                                <span class="summary-label">Total</span>
+                                <span id="totalAmount" class="summary-total">$10.00</span>
+                            </div>
+                        </div>
+
+                        <!-- PayPal Button Container -->
+                        <div id="paypal-button-container" class="paypal-container">
+                            <!-- Loading Overlay for Payment Processing -->
+                            <div id="paymentLoadingOverlay" class="payment-loading-overlay hidden">
+                                <div class="payment-loading-spinner"></div>
+                                <div class="payment-loading-text">Processing your payment...</div>
+                                <div class="payment-loading-subtitle">Please wait, do not refresh the page</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Error/Success Messages -->
+                        <div id="result-message" class="result-message"></div>
+
+                        <!-- Step Navigation -->
+                        <div class="step-navigation">
+                            <button class="nav-btn back-btn" id="step4Back">
+                                <span class="btn-icon">←</span>
+                                <span class="btn-text">Back</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="container">
+                <div class="footer-links">
+                    <a href="/terms.html" target="_blank" rel="noopener noreferrer">Terms & Conditions</a>
+                    <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+                    <a href="/refund.html" target="_blank" rel="noopener noreferrer">Refund Policy</a>
+                </div>
+                <p class="footer-text">&copy; 2025 Upscale Marketing Solutions. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+
+            <!-- PayPal SDK -->
+        <script src="https://www.paypal.com/sdk/js?client-id=AUyspX7EHfoCBLRqd_DXOaJClqJQvdEH8YVOAdIP8KMsWOB8nq5sRj0pBiRvCoh0qnOrrl2Yg2d_V7Wa&currency=USD&components=buttons&enable-funding=venmo,paylater,card&disable-funding=credit" 
+                data-sdk-integration-source="developer-studio"></script>
+    
+    <!-- Firebase SDK -->
+    <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
