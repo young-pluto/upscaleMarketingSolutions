@@ -2297,3 +2297,359 @@ body {
         font-size: 14px;
     }
 }
+
+/* ============================================
+   UPSCALE CHECKOUT THEME REFRESH
+   ============================================ */
+
+:root {
+    --brand-ink: #101317;
+    --brand-ink-soft: #252b34;
+    --brand-paper: #ffffff;
+    --brand-canvas: #fcf8f4;
+    --brand-canvas-soft: #f6efe8;
+    --brand-line: #e8ddd3;
+    --brand-line-strong: #dac7b8;
+    --brand-red: #f1161f;
+    --brand-red-deep: #b40d14;
+    --brand-red-soft: #fff1f2;
+    --brand-gold: #c7902e;
+    --brand-gold-deep: #9e6911;
+    --brand-gold-soft: #fff7e7;
+    --brand-muted: #5f6773;
+    --brand-muted-light: #9299a4;
+}
+
+body {
+    color: var(--brand-ink);
+    background: linear-gradient(180deg, var(--brand-canvas) 0%, #ffffff 38%, #fff6f3 100%);
+}
+
+.hero-section,
+.success-hero {
+    background: linear-gradient(135deg, #0b0c0f 0%, #171a20 54%, #2a1015 100%);
+}
+
+.hero-section::after,
+.success-hero::after {
+    content: '';
+    position: absolute;
+    right: -8%;
+    bottom: -22%;
+    width: 320px;
+    height: 320px;
+    background: radial-gradient(circle, rgba(241, 22, 31, 0.18) 0%, rgba(241, 22, 31, 0) 72%);
+    filter: blur(6px);
+    pointer-events: none;
+}
+
+.hero-badge {
+    background: linear-gradient(135deg, var(--brand-gold) 0%, #e2b250 100%);
+    color: var(--brand-ink);
+    box-shadow: 0 8px 22px rgba(199, 144, 46, 0.22);
+}
+
+.hero-title-sub,
+.hero-description,
+.success-title-sub,
+.success-description,
+.payment-loading-subtitle,
+.full-page-subtitle {
+    color: #d6dbe2;
+}
+
+.stat-number {
+    color: var(--brand-gold);
+}
+
+.stat-label {
+    color: #a8b0ba;
+}
+
+.step-card,
+.order-summary-card,
+.timeline-card,
+.action-card,
+.package-card,
+.details-card,
+.form-card,
+.payment-card {
+    background: rgba(255, 255, 255, 0.97);
+    border: 1px solid rgba(16, 19, 23, 0.08);
+    box-shadow: 0 22px 56px rgba(16, 19, 23, 0.08);
+}
+
+.campaign-preview,
+.details-card,
+.timeline-card {
+    background: linear-gradient(180deg, var(--brand-gold-soft) 0%, #fffaf3 100%);
+    border-color: rgba(199, 144, 46, 0.26);
+}
+
+.form-card {
+    background: linear-gradient(180deg, #fff6f6 0%, #ffffff 100%);
+    border-color: rgba(241, 22, 31, 0.16);
+}
+
+.payment-card,
+.order-summary-card {
+    background: linear-gradient(180deg, #fff9f7 0%, #ffffff 100%);
+    border-color: rgba(241, 22, 31, 0.15);
+}
+
+.action-card {
+    background: linear-gradient(180deg, #ffffff 0%, var(--brand-canvas-soft) 100%);
+    border-color: var(--brand-line);
+}
+
+.section-title,
+.engagement-title,
+.summary-amount,
+#summarySelectedAmount,
+.summary-total,
+.amount-display,
+.detail-value,
+.timeline-title,
+.support-title,
+.engagement-content h4 {
+    color: var(--brand-ink);
+}
+
+.section-subtitle,
+.amount-label,
+.quick-select-label,
+.summary-label,
+.campaign-description p,
+.engagement-content p,
+.detail-label,
+.detail-text,
+.form-hint,
+.timeline-description,
+.support-description,
+.support-contact,
+.form-input::placeholder {
+    color: var(--brand-muted);
+}
+
+.amount-slider,
+.amount-slider::-webkit-slider-track {
+    background: var(--brand-line);
+}
+
+.amount-slider::-webkit-slider-thumb {
+    background: linear-gradient(135deg, var(--brand-gold) 0%, var(--brand-gold-deep) 100%);
+    box-shadow: 0 6px 16px rgba(199, 144, 46, 0.34);
+}
+
+.amount-slider::-moz-range-thumb {
+    background: linear-gradient(135deg, var(--brand-gold) 0%, var(--brand-gold-deep) 100%);
+    box-shadow: 0 6px 16px rgba(199, 144, 46, 0.34);
+}
+
+.amount-btn {
+    border-color: var(--brand-line);
+    color: var(--brand-ink-soft);
+}
+
+.amount-btn::before {
+    background: linear-gradient(90deg, transparent, rgba(241, 22, 31, 0.08), transparent);
+}
+
+.amount-btn:hover {
+    border-color: rgba(241, 22, 31, 0.42);
+    color: var(--brand-red);
+    box-shadow: 0 10px 28px rgba(241, 22, 31, 0.12);
+}
+
+.amount-btn.active {
+    background: linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-deep) 100%);
+    border-color: var(--brand-red-deep);
+    box-shadow: 0 12px 28px rgba(241, 22, 31, 0.2);
+}
+
+.step-progress::before {
+    background: linear-gradient(90deg, rgba(16, 19, 23, 0.08), rgba(241, 22, 31, 0.18), rgba(16, 19, 23, 0.08));
+}
+
+.step-circle {
+    background: #ffffff;
+    color: var(--brand-muted);
+    border-color: #f3ece5;
+}
+
+.step-item.active .step-circle {
+    background: linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-deep) 100%);
+    box-shadow: 0 6px 18px rgba(241, 22, 31, 0.24);
+}
+
+.step-item.completed .step-circle {
+    background: linear-gradient(135deg, #15181d 0%, #2c313a 100%);
+    color: #ffffff;
+}
+
+.step-item.active .step-label {
+    color: var(--brand-red);
+}
+
+.campaign-preview,
+.custom-amount,
+.campaign-description {
+    background: linear-gradient(180deg, #ffffff 0%, #faf7f2 100%);
+    border-color: var(--brand-line);
+}
+
+.preview-expand,
+.engagement-toggle,
+.support-contact a {
+    color: var(--brand-red);
+}
+
+.preview-expand:hover,
+.engagement-toggle:hover {
+    background: rgba(241, 22, 31, 0.08);
+    color: var(--brand-red);
+}
+
+.preview-details {
+    border-top-color: rgba(199, 144, 46, 0.22);
+}
+
+.detail-item,
+.engagement-card,
+.engagement-item,
+.engagement-breakdown,
+.timeline-content,
+.order-summary,
+.order-details,
+.support-card {
+    background: rgba(255, 255, 255, 0.96);
+    border-color: var(--brand-line);
+}
+
+.engagement-card:hover {
+    border-color: rgba(241, 22, 31, 0.4);
+    box-shadow: 0 12px 28px rgba(241, 22, 31, 0.08);
+}
+
+.currency-symbol,
+.required,
+.contact-note {
+    color: var(--brand-red);
+}
+
+#customAmount,
+.form-input {
+    border-color: var(--brand-line);
+}
+
+#customAmount:focus,
+.form-input:focus {
+    border-color: var(--brand-red);
+    box-shadow: 0 0 0 3px rgba(241, 22, 31, 0.1);
+}
+
+.custom-btn {
+    background: linear-gradient(135deg, var(--brand-ink) 0%, #2b313a 100%);
+    box-shadow: 0 12px 26px rgba(16, 19, 23, 0.14);
+}
+
+.custom-btn:hover {
+    box-shadow: 0 16px 32px rgba(16, 19, 23, 0.2);
+}
+
+.next-btn,
+.primary-btn {
+    background: linear-gradient(135deg, var(--brand-red) 0%, var(--brand-red-deep) 100%);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 14px 32px rgba(241, 22, 31, 0.2);
+}
+
+.next-btn:hover,
+.primary-btn:hover {
+    background: linear-gradient(135deg, #ff3138 0%, var(--brand-red-deep) 100%);
+    box-shadow: 0 18px 36px rgba(241, 22, 31, 0.28);
+}
+
+.back-btn {
+    background: #ffffff;
+    color: var(--brand-ink-soft);
+    border-color: var(--brand-line);
+}
+
+.back-btn:hover {
+    background: var(--brand-canvas);
+    color: var(--brand-ink);
+    border-color: var(--brand-line-strong);
+}
+
+.summary-row,
+.detail-row {
+    border-bottom-color: #f0e8e1;
+}
+
+.summary-row.total,
+.detail-row.total-row {
+    border-top-color: var(--brand-line-strong);
+}
+
+.timeline-item:not(:last-child)::after {
+    background: linear-gradient(180deg, var(--brand-gold) 0%, #e3b54f 100%);
+}
+
+.timeline-icon {
+    background: linear-gradient(135deg, var(--brand-gold) 0%, var(--brand-gold-deep) 100%);
+    box-shadow: 0 4px 16px rgba(199, 144, 46, 0.28);
+}
+
+.timeline-time {
+    color: var(--brand-gold-deep);
+}
+
+.secondary-btn {
+    background: #ffffff;
+    color: var(--brand-ink);
+    border-color: rgba(16, 19, 23, 0.16);
+}
+
+.secondary-btn:hover {
+    background: var(--brand-ink);
+    color: #ffffff;
+    border-color: var(--brand-ink);
+    box-shadow: 0 14px 30px rgba(16, 19, 23, 0.18);
+}
+
+.footer {
+    background: #0b0c0f;
+    border-top: 1px solid rgba(241, 22, 31, 0.16);
+}
+
+.footer-text {
+    color: #9098a4;
+}
+
+.footer-links a {
+    color: #d7dbe2;
+}
+
+.footer-links a:hover {
+    color: var(--brand-gold);
+}
+
+.amount-btn:focus,
+.custom-btn:focus,
+.form-input:focus,
+.amount-slider:focus,
+.action-btn:focus {
+    outline: 2px solid var(--brand-gold);
+}
+
+@media (max-width: 800px) {
+    .step-item.active .step-label::before {
+        color: var(--brand-red) !important;
+    }
+
+    .step-item.completed .step-label::before {
+        color: var(--brand-ink-soft) !important;
+    }
+}
