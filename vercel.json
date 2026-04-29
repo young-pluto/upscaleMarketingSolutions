@@ -1,4 +1,29 @@
 {
-    "version": 2,
-    "cleanUrls": true
-  }
+  "version": 2,
+  "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/index.html",
+      "destination": "/youtube-promotion",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/home.html"
+    },
+    {
+      "source": "/youtube-promotion",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin",
+      "destination": "/admin.html"
+    },
+    {
+      "source": "/success",
+      "destination": "/success.html"
+    }
+  ]
+}

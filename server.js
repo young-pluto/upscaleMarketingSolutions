@@ -34,8 +34,12 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'home.html'));
 });
 
-app.get('/index.html', (req, res) => {
+app.get('/youtube-promotion', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/index.html', (req, res) => {
+    res.redirect(301, '/youtube-promotion');
 });
 
 app.get('/admin', (req, res) => {
