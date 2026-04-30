@@ -1,10 +1,8 @@
 import { getDatabase } from './_firebase-admin.js';
 
 export default async function handler(req, res) {
-    // Initialize Firebase if needed
     const database = getDatabase();
-    
-    // Set CORS headers
+
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -20,38 +18,36 @@ export default async function handler(req, res) {
     }
 
     try {
-        console.log('Fetching orders from Firebase...');
-        
-        const ordersRef = database.ref('orders');
-        const snapshot = await ordersRef.orderByChild('createdAt').limitToLast(100).once('value');
-        
-        const orders = [];
+        console.log('Fetching trial campaign submissions from Firebase...');
+
+        const trialCampaignRef = database.ref('trialCampaignSubmissions');
+        const snapshot = await trialCampaignRef.orderByChild('createdAt').limitToLast(200).once('value');
+
+        const trialCampaigns = [];
         if (snapshot.exists()) {
             snapshot.forEach((childSnapshot) => {
-                orders.push({
+                trialCampaigns.push({
                     firebaseKey: childSnapshot.key,
                     ...childSnapshot.val()
                 });
             });
         }
 
-        // Sort by most recent first
-        orders.reverse();
+        trialCampaigns.reverse();
 
-        console.log(`Found ${orders.length} orders`);
-        
-        return res.status(200).json({ 
+        console.log(`Found ${trialCampaigns.length} trial campaign submissions`);
+
+        return res.status(200).json({
             success: true,
-            orders: orders,
-            count: orders.length
+            trialCampaigns,
+            count: trialCampaigns.length
         });
-
     } catch (error) {
-        console.error('Error fetching orders:', error);
-        
-        return res.status(500).json({ 
-            error: 'Failed to fetch orders',
-            message: error.message 
+        console.error('Error fetching trial campaigns:', error);
+
+        return res.status(500).json({
+            error: 'Failed to fetch trial campaigns',
+            message: error.message
         });
     }
-} 
+}

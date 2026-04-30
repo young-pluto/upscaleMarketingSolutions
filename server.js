@@ -21,6 +21,8 @@ import captureOrder from './api/capture-order.js';
 import submitOrder from './api/submit-order.js';
 import getOrders from './api/get-orders.js';
 import getOrder from './api/get-order.js';
+import submitTrialCampaign from './api/submit-trial-campaign.js';
+import getTrialCampaigns from './api/get-trial-campaigns.js';
 
 // API routes
 app.post('/api/create-order', createOrder);
@@ -28,6 +30,8 @@ app.post('/api/capture-order', captureOrder);
 app.post('/api/submit-order', submitOrder);
 app.get('/api/get-orders', getOrders);
 app.get('/api/get-order', getOrder);
+app.post('/api/submit-trial-campaign', submitTrialCampaign);
+app.get('/api/get-trial-campaigns', getTrialCampaigns);
 
 // Serve static files - ROUTES FIRST
 app.get('/', (req, res) => {
@@ -36,6 +40,10 @@ app.get('/', (req, res) => {
 
 app.get('/youtube-promotion', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/trial-campaign', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'trial-campaign.html'));
 });
 
 app.get('/index.html', (req, res) => {

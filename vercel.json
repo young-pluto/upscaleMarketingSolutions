@@ -18,6 +18,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/trial-campaign",
+      "destination": "/trial-campaign.html"
+    },
+    {
       "source": "/admin",
       "destination": "/admin.html"
     },
