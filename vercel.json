@@ -22,6 +22,18 @@
       "destination": "/trial-campaign.html"
     },
     {
+      "source": "/trial-campaign-intake",
+      "destination": "/trial-campaign-intake.html"
+    },
+    {
+      "source": "/trial-campaign-success",
+      "destination": "/trial-campaign-success.html"
+    },
+    {
+      "source": "/campaign-progress",
+      "destination": "/campaign-progress.html"
+    },
+    {
       "source": "/admin",
       "destination": "/admin.html"
     },

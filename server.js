@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import os from 'os';
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -11,6 +12,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Middleware
 app.use(express.json());
@@ -46,6 +48,18 @@ app.get('/trial-campaign', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'trial-campaign.html'));
 });
 
+app.get('/trial-campaign-intake', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'trial-campaign-intake.html'));
+});
+
+app.get('/trial-campaign-success', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'trial-campaign-success.html'));
+});
+
+app.get('/campaign-progress', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'campaign-progress.html'));
+});
+
 app.get('/index.html', (req, res) => {
     res.redirect(301, '/youtube-promotion');
 });
@@ -61,6 +75,18 @@ app.get('/success', (req, res) => {
 // Static files AFTER routes
 app.use(express.static('public'));
 
-app.listen(PORT, () => {
+app.listen(PORT, HOST, () => {
+    const networkInterfaces = os.networkInterfaces();
+    const localAddresses = Object.values(networkInterfaces)
+        .flat()
+        .filter((details) => details && details.family === 'IPv4' && !details.internal)
+        .map((details) => details.address);
+
     console.log(`Server running on http://localhost:${PORT}`);
+
+    if (localAddresses.length > 0) {
+        localAddresses.forEach((address) => {
+            console.log(`LAN access available at http://${address}:${PORT}`);
+        });
+    }
 }); 

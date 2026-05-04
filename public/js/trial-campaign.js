@@ -19,20 +19,40 @@ class TrialCampaignForm {
         this.youtubeThumbnail = document.getElementById('youtubeThumbnail');
         this.youtubeWatchLink = document.getElementById('youtubeWatchLink');
         this.formMessage = document.getElementById('formMessage');
+        this.backBtn = document.getElementById('backBtn');
+        this.nextBtn = document.getElementById('nextBtn');
         this.submitBtn = document.getElementById('submitBtn');
-        this.successState = document.getElementById('successState');
-        this.successReference = document.getElementById('successReference');
-        this.submitAnotherBtn = document.getElementById('submitAnotherBtn');
+        this.progressFill = document.getElementById('stepProgressFill');
+        this.stepItems = Array.from(document.querySelectorAll('.step-progress-item'));
+        this.steps = Array.from(document.querySelectorAll('.form-step'));
+        this.currentStep = 1;
+        this.maxSteps = this.steps.length;
+        this.nextLabels = {
+            1: 'Continue',
+            2: 'Proceed'
+        };
 
         this.youtubePreviewTimer = null;
         this.init();
     }
 
     init() {
+        this.setupStepNavigation();
         this.setupGenreField();
         this.setupYouTubePreview();
         this.setupFormSubmit();
-        this.setupReset();
+        this.updateStepUI();
+    }
+
+    setupStepNavigation() {
+        this.nextBtn.addEventListener('click', () => {
+            if (!this.validateStep(this.currentStep)) return;
+            this.goToStep(this.currentStep + 1);
+        });
+
+        this.backBtn.addEventListener('click', () => {
+            this.goToStep(this.currentStep - 1);
+        });
     }
 
     setupGenreField() {
@@ -45,6 +65,10 @@ class TrialCampaignForm {
                 : '<option value="">Choose a genre first</option>';
 
             this.subgenreSelect.disabled = options.length === 0;
+            const subgenreFrame = document.getElementById('subgenreFrame');
+            if (subgenreFrame) {
+                subgenreFrame.classList.toggle('is-disabled', options.length === 0);
+            }
         });
     }
 
@@ -57,11 +81,74 @@ class TrialCampaignForm {
         });
     }
 
+    goToStep(step) {
+        if (step < 1 || step > this.maxSteps) return;
+        this.currentStep = step;
+        this.showMessage('', 'success');
+        this.updateStepUI();
+        this.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    updateStepUI() {
+        this.steps.forEach((stepEl) => {
+            const stepNumber = Number(stepEl.dataset.step);
+            stepEl.classList.toggle('active', stepNumber === this.currentStep);
+        });
+
+        this.stepItems.forEach((item) => {
+            const stepNumber = Number(item.dataset.step);
+            item.classList.toggle('active', stepNumber === this.currentStep);
+            item.classList.toggle('complete', stepNumber < this.currentStep);
+        });
+
+        const progressPercent = (this.currentStep / this.maxSteps) * 100;
+        this.progressFill.style.width = `${progressPercent}%`;
+
+        this.backBtn.classList.toggle('is-hidden', this.currentStep === 1);
+        this.nextBtn.classList.toggle('is-hidden', this.currentStep === this.maxSteps);
+        this.submitBtn.classList.toggle('is-hidden', this.currentStep !== this.maxSteps);
+        if (this.nextLabels[this.currentStep]) {
+            this.nextBtn.textContent = this.nextLabels[this.currentStep];
+        }
+    }
+
+    validateStep(stepNumber) {
+        const fieldsByStep = {
+            1: [document.getElementById('fullName'), this.genreSelect],
+            2: [document.getElementById('yearsMakingMusic'), this.youtubeInput],
+            3: [document.getElementById('targetAgeGroup')]
+        };
+
+        const fields = fieldsByStep[stepNumber] || [];
+
+        for (const field of fields) {
+            if (!field) continue;
+
+            if (field === this.youtubeInput) {
+                const youtubeVideoId = this.extractYouTubeVideoId(this.youtubeInput.value);
+                if (!youtubeVideoId) {
+                    this.youtubeInput.setCustomValidity('Please provide a valid YouTube video link.');
+                    this.youtubeInput.reportValidity();
+                    this.showMessage('Please provide a valid YouTube video link.', 'error');
+                    return false;
+                }
+                this.youtubeInput.setCustomValidity('');
+            }
+
+            if (!field.reportValidity()) {
+                this.showMessage('Please complete this step before continuing.', 'error');
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     setupFormSubmit() {
         this.form.addEventListener('submit', async (event) => {
             event.preventDefault();
 
-            if (!this.form.reportValidity()) {
+            if (!this.validateStep(this.currentStep) || !this.form.reportValidity()) {
                 this.showMessage('Please complete the required fields first.', 'error');
                 return;
             }
@@ -87,7 +174,7 @@ class TrialCampaignForm {
             };
 
             this.setSubmittingState(true);
-            this.showMessage('Submitting your trial campaign brief...', 'success');
+            this.showMessage('Submitting your campaign intake...', 'success');
 
             try {
                 const response = await fetch('/api/submit-trial-campaign', {
@@ -104,29 +191,23 @@ class TrialCampaignForm {
                     throw new Error(result.message || result.error || 'Something went wrong while submitting the form.');
                 }
 
-                this.successReference.textContent = result.submissionId;
-                this.form.classList.add('is-hidden');
-                this.successState.classList.remove('is-hidden');
-                this.showMessage('', 'success');
-                this.successState.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                const videoId = this.extractYouTubeVideoId(payload.youtubeLink);
+                window.sessionStorage.setItem('trialCampaignLastSubmission', JSON.stringify({
+                    submissionId: result.submissionId,
+                    fullName: payload.fullName,
+                    genre: payload.genre,
+                    youtubeLink: payload.youtubeLink,
+                    youtubeVideoId: videoId,
+                    youtubeThumbnailUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+                }));
+
+                window.location.href = '/trial-campaign-success';
             } catch (error) {
                 console.error('Trial campaign submission error:', error);
                 this.showMessage(error.message || 'Failed to submit the form. Please try again.', 'error');
             } finally {
                 this.setSubmittingState(false);
             }
-        });
-    }
-
-    setupReset() {
-        this.submitAnotherBtn.addEventListener('click', () => {
-            this.form.reset();
-            this.subgenreSelect.innerHTML = '<option value="">Choose a genre first</option>';
-            this.subgenreSelect.disabled = true;
-            this.youtubePreview.classList.add('is-hidden');
-            this.successState.classList.add('is-hidden');
-            this.form.classList.remove('is-hidden');
-            this.showMessage('', 'success');
         });
     }
 
@@ -183,7 +264,7 @@ class TrialCampaignForm {
         this.submitBtn.disabled = isSubmitting;
         this.submitBtn.querySelector('.submit-btn-label').textContent = isSubmitting
             ? 'Submitting...'
-            : 'Submit Trial Campaign';
+            : 'Submit for Review';
     }
 
     showMessage(message, type) {

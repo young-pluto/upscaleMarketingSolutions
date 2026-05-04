@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upscale | Private Artist Invite</title>
-    <meta name="description" content="Selected from a limited pool of artists showing rare potential.">
+    <title>Upscale | Invite Confirmed</title>
+    <meta name="description" content="Your campaign brief has been received and is now under review.">
     <meta name="theme-color" content="#f7f6f3">
-    <link rel="canonical" href="https://upscalemarketingsolutions.com/trial-campaign">
+    <link rel="canonical" href="https://upscalemarketingsolutions.com/trial-campaign-success">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Upscale Marketing Solutions">
-    <meta property="og:url" content="https://upscalemarketingsolutions.com/trial-campaign">
-    <meta property="og:title" content="Upscale | Private Artist Invite">
-    <meta property="og:description" content="Selected from a limited pool of artists showing rare potential.">
+    <meta property="og:url" content="https://upscalemarketingsolutions.com/trial-campaign-success">
+    <meta property="og:title" content="Upscale | Invite Confirmed">
+    <meta property="og:description" content="Your campaign brief has been received and is now under review.">
     <meta property="og:image" content="https://firebasestorage.googleapis.com/v0/b/slot-booking-c28d8.appspot.com/o/A357A8F0-A23B-4CF7-8518-AE926DD045A7%20(1).png?alt=media&token=20a1663c-a215-45b1-9acc-a6e0d3d29f14">
     <meta property="og:image:secure_url" content="https://firebasestorage.googleapis.com/v0/b/slot-booking-c28d8.appspot.com/o/A357A8F0-A23B-4CF7-8518-AE926DD045A7%20(1).png?alt=media&token=20a1663c-a215-45b1-9acc-a6e0d3d29f14">
     <meta property="og:image:alt" content="Upscale Marketing Solutions logo">
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Upscale | Private Artist Invite">
-    <meta name="twitter:description" content="Selected from a limited pool of artists showing rare potential.">
+    <meta name="twitter:title" content="Upscale | Invite Confirmed">
+    <meta name="twitter:description" content="Your campaign brief has been received and is now under review.">
     <meta name="twitter:image" content="https://firebasestorage.googleapis.com/v0/b/slot-booking-c28d8.appspot.com/o/A357A8F0-A23B-4CF7-8518-AE926DD045A7%20(1).png?alt=media&token=20a1663c-a215-45b1-9acc-a6e0d3d29f14">
     <link rel="icon" type="image/png" href="https://firebasestorage.googleapis.com/v0/b/slot-booking-c28d8.appspot.com/o/A357A8F0-A23B-4CF7-8518-AE926DD045A7%20(1).png?alt=media&token=20a1663c-a215-45b1-9acc-a6e0d3d29f14">
     <link rel="apple-touch-icon" href="https://firebasestorage.googleapis.com/v0/b/slot-booking-c28d8.appspot.com/o/A357A8F0-A23B-4CF7-8518-AE926DD045A7%20(1).png?alt=media&token=20a1663c-a215-45b1-9acc-a6e0d3d29f14">
@@ -27,7 +27,7 @@
     <link rel="stylesheet" href="css/trial-campaign.css">
 </head>
 <body class="flow-page">
-    <main class="flow-shell">
+    <main class="flow-shell success-main">
         <header class="flow-header">
             <a href="/" class="brand-lockup brand-crest" aria-label="Upscale Marketing Solutions">
                 <span class="brand-mark">
@@ -38,17 +38,33 @@
             </a>
         </header>
 
-        <section class="entry-main">
-            <div class="entry-card">
-                <div class="page-badge">Private Artist Invite</div>
-                <h1 class="entry-title">You've been<br><span class="title-accent">selected.</span></h1>
-                <p class="entry-copy">Selected from a limited pool of artists showing rare potential.</p>
-                <div class="entry-actions">
-                    <a href="/trial-campaign-intake" class="primary-button">Accept Invite</a>
+        <section class="success-card">
+            <div class="mini-badge">Invite Confirmed</div>
+            <div>
+                <h1 class="success-title">You're in.</h1>
+                <p class="success-copy">Your campaign intake is in. Our team will review it and update you within the next 12-24 hours.</p>
+            </div>
+
+            <div class="result-meta">
+                <span class="result-meta-label">Reference ID</span>
+                <strong id="submissionReference" class="result-meta-value">Pending</strong>
+            </div>
+
+            <div id="resultVideoPreview" class="result-video-preview is-hidden">
+                <img id="resultThumbnail" class="result-video-thumb" alt="Submitted YouTube video thumbnail">
+                <div class="result-video-copy">
+                    <div class="section-kicker">Selected Video</div>
+                    <a id="resultVideoLink" href="#" target="_blank" rel="noopener noreferrer" class="video-preview-link">Open submitted video</a>
                 </div>
-                <p class="micro-note">Takes less than 60 seconds.</p>
+            </div>
+
+            <div class="cta-row">
+                <a href="/campaign-progress" class="primary-button">Check Campaign Progress</a>
+                <a href="/" class="secondary-button">Back to Website</a>
             </div>
         </section>
     </main>
+
+    <script type="module" src="js/trial-campaign-success.js"></script>
 </body>
 </html>

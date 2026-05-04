@@ -72,7 +72,7 @@ export default async function handler(req, res) {
         const targetRegions = sanitizeString(req.body.targetRegions, 500);
         const targetAgeGroup = sanitizeString(req.body.targetAgeGroup, 80);
 
-        if (!fullName || !genre || !yearsMakingMusic || !youtubeLink || !targetRegions || !targetAgeGroup) {
+        if (!fullName || !genre || !yearsMakingMusic || !youtubeLink || !targetAgeGroup) {
             return res.status(400).json({
                 error: 'Missing required fields',
                 message: 'Please complete all required fields before submitting.'
