@@ -27,6 +27,7 @@
                 <h1>Leads</h1>
             </div>
             <div class="header-actions">
+                <button id="channelsBtn" class="ghost-btn" type="button">Channels</button>
                 <button id="clipboardBtn" class="icon-btn" type="button" aria-label="Open clipboard">
                     <span class="icon-clip"></span>
                     <span class="clipboard-count" id="clipboardCount">0</span>
@@ -147,6 +148,15 @@
         </section>
     </div>
 
+    <div id="contactChannelSheet" class="sheet-backdrop" hidden>
+        <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="contactChannelTitle">
+            <h2 id="contactChannelTitle">Outreach channel</h2>
+            <p>Select the channel used to contact this lead.</p>
+            <div id="contactChannelOptions" class="sheet-options"></div>
+            <button type="button" class="sheet-cancel" id="contactChannelCancel">Cancel</button>
+        </section>
+    </div>
+
     <aside id="clipboardDrawer" class="drawer" aria-hidden="true">
         <div class="drawer-header">
             <div>
@@ -163,6 +173,23 @@
         </form>
         <div id="messageList" class="message-list"></div>
         <div id="messageEmpty" class="empty-state">No saved messages yet.</div>
+    </aside>
+
+    <aside id="channelsDrawer" class="drawer" aria-hidden="true">
+        <div class="drawer-header">
+            <div>
+                <p class="eyebrow">Settings</p>
+                <h2>Outreach Channels</h2>
+            </div>
+            <button id="channelsClose" class="icon-btn" type="button" aria-label="Close channels">x</button>
+        </div>
+        <form id="channelForm" class="message-form">
+            <input id="channelName" type="text" placeholder="Channel name" maxlength="80" required>
+            <button type="submit" class="primary-btn">Add channel</button>
+            <p id="channelMessage" class="form-message"></p>
+        </form>
+        <div id="channelList" class="message-list"></div>
+        <div id="channelEmpty" class="empty-state">Add the outreach channels your team uses.</div>
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>

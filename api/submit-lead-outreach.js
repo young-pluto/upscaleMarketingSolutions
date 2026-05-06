@@ -16,6 +16,19 @@ function isValidUrl(value, allowedHosts) {
     }
 }
 
+function extractInstagramUsername(value) {
+    try {
+        const url = new URL(String(value || '').trim());
+        return (url.pathname.split('/').filter(Boolean)[0] || '').replace(/^@/, '').toLowerCase();
+    } catch (error) {
+        return '';
+    }
+}
+
+function createInstagramIndexKey(username) {
+    return Buffer.from(username.toLowerCase(), 'utf8').toString('base64url');
+}
+
 function createReferenceId(prefix) {
     const now = new Date();
     const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
@@ -95,9 +108,22 @@ export default async function handler(req, res) {
             });
         }
 
+        const instagramUsername = extractInstagramUsername(instagramLink);
+        if (!instagramUsername) {
+            return res.status(400).json({
+                error: 'Invalid Instagram profile',
+                message: 'Please provide a valid Instagram profile link.'
+            });
+        }
+
+        const instagramUsernameKey = instagramUsername;
+        const instagramIndexKey = createInstagramIndexKey(instagramUsernameKey);
+
         const leadData = {
             leadId: createReferenceId('LD'),
             instagramLink,
+            instagramUsername,
+            instagramUsernameKey,
             youtubeLink,
             source: 'lead-outreach-form',
             leadStatus: 'new',
@@ -110,7 +136,32 @@ export default async function handler(req, res) {
             userAgent: req.headers['user-agent'] || ''
         };
 
-        const newLeadRef = await database.ref('leadOutreach/leads').push(leadData);
+        const newLeadRef = database.ref('leadOutreach/leads').push();
+        const indexRef = database.ref(`leadOutreach/leadInstagramIndex/${instagramIndexKey}`);
+        const indexResult = await indexRef.transaction((currentValue) => {
+            if (currentValue) return;
+
+            return {
+                leadKey: newLeadRef.key,
+                username: instagramUsername,
+                instagramUsernameKey,
+                createdAt: admin.database.ServerValue.TIMESTAMP
+            };
+        });
+
+        if (!indexResult.committed) {
+            return res.status(409).json({
+                error: 'Duplicate Instagram lead',
+                message: `Duplicate entry: @${instagramUsername} has already been added.`
+            });
+        }
+
+        try {
+            await newLeadRef.set(leadData);
+        } catch (error) {
+            await indexRef.remove();
+            throw error;
+        }
 
         return res.status(200).json({
             success: true,

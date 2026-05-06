@@ -3,7 +3,8 @@ import { admin, getDatabase } from './_firebase-admin.js';
 const COLLECTIONS = {
     leads: 'leadOutreach/leads',
     pages: 'leadOutreach/pages',
-    clipboardMessages: 'leadOutreach/clipboardMessages'
+    clipboardMessages: 'leadOutreach/clipboardMessages',
+    channels: 'leadOutreach/channels'
 };
 
 const SERVER_TIMESTAMP = '__SERVER_TIMESTAMP__';
@@ -24,6 +25,19 @@ function createReferenceId(prefix) {
     const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     const randomPart = Math.random().toString(36).slice(2, 6).toUpperCase();
     return `${prefix}-${datePart}-${randomPart}`;
+}
+
+function extractInstagramUsername(value) {
+    try {
+        const url = new URL(String(value || '').trim());
+        return (url.pathname.split('/').filter(Boolean)[0] || '').replace(/^@/, '').toLowerCase();
+    } catch (error) {
+        return '';
+    }
+}
+
+function createInstagramIndexKey(username) {
+    return Buffer.from(username.toLowerCase(), 'utf8').toString('base64url');
 }
 
 function getCollectionPath(collection) {
@@ -68,9 +82,10 @@ async function requireFirebaseUser(req) {
 
 function normalizeUpdates(collection, updates, user) {
     const allowedFields = {
-        leads: ['leadStatus', 'discardReason', 'adminNotes', 'contactedAt', 'convertedAt', 'discardedAt'],
+        leads: ['leadStatus', 'discardReason', 'adminNotes', 'contactedAt', 'convertedAt', 'discardedAt', 'outreachChannelId', 'outreachChannelName'],
         pages: ['instagramUrl', 'isExhausted', 'pageStatus', 'exhaustedAt', 'notes'],
-        clipboardMessages: ['title', 'body']
+        clipboardMessages: ['title', 'body'],
+        channels: ['name', 'isActive']
     };
 
     const normalized = {};
@@ -104,18 +119,42 @@ function normalizeUpdates(collection, updates, user) {
     return normalized;
 }
 
+async function ensureLeadIndexes(database, leads) {
+    const updates = {};
+
+    for (const lead of leads) {
+        const username = lead.instagramUsernameKey || extractInstagramUsername(lead.instagramLink);
+        if (!username) continue;
+
+        const indexKey = createInstagramIndexKey(username);
+        updates[`leadOutreach/leads/${lead.firebaseKey}/instagramUsername`] = lead.instagramUsername || username;
+        updates[`leadOutreach/leads/${lead.firebaseKey}/instagramUsernameKey`] = username;
+        updates[`leadOutreach/leadInstagramIndex/${indexKey}/leadKey`] = lead.firebaseKey;
+        updates[`leadOutreach/leadInstagramIndex/${indexKey}/username`] = username;
+        updates[`leadOutreach/leadInstagramIndex/${indexKey}/instagramUsernameKey`] = username;
+    }
+
+    if (Object.keys(updates).length > 0) {
+        await database.ref().update(updates);
+    }
+}
+
 async function handleGet(database, res) {
-    const [leadsSnapshot, pagesSnapshot, messagesSnapshot] = await Promise.all([
+    const [leadsSnapshot, pagesSnapshot, messagesSnapshot, channelsSnapshot] = await Promise.all([
         database.ref(COLLECTIONS.leads).orderByChild('createdAt').limitToLast(500).once('value'),
         database.ref(COLLECTIONS.pages).orderByChild('createdAt').limitToLast(500).once('value'),
-        database.ref(COLLECTIONS.clipboardMessages).orderByChild('createdAt').limitToLast(200).once('value')
+        database.ref(COLLECTIONS.clipboardMessages).orderByChild('createdAt').limitToLast(200).once('value'),
+        database.ref(COLLECTIONS.channels).orderByChild('createdAt').limitToLast(100).once('value')
     ]);
+    const leads = snapshotToArray(leadsSnapshot);
+    await ensureLeadIndexes(database, leads);
 
     return res.status(200).json({
         success: true,
-        leads: snapshotToArray(leadsSnapshot),
+        leads,
         pages: snapshotToArray(pagesSnapshot),
-        clipboardMessages: snapshotToArray(messagesSnapshot)
+        clipboardMessages: snapshotToArray(messagesSnapshot),
+        channels: snapshotToArray(channelsSnapshot)
     });
 }
 
@@ -123,7 +162,7 @@ async function handlePost(database, req, res, user) {
     const collection = sanitizeString(req.body.collection, 80);
     const collectionPath = getCollectionPath(collection);
 
-    if (!collectionPath || !['pages', 'clipboardMessages'].includes(collection)) {
+    if (!collectionPath || !['pages', 'clipboardMessages', 'channels'].includes(collection)) {
         return res.status(400).json({ error: 'Invalid collection' });
     }
 
@@ -161,6 +200,21 @@ async function handlePost(database, req, res, user) {
         }
     }
 
+    if (collection === 'channels') {
+        data = {
+            channelId: createReferenceId('CH'),
+            name: sanitizeString(req.body.data?.name, 80),
+            isActive: true,
+            createdAt: admin.database.ServerValue.TIMESTAMP,
+            updatedAt: admin.database.ServerValue.TIMESTAMP,
+            createdBy: user.email || user.uid || ''
+        };
+
+        if (!data.name) {
+            return res.status(400).json({ error: 'Channel name is required' });
+        }
+    }
+
     const newRef = await database.ref(collectionPath).push(data);
     return res.status(200).json({
         success: true,
@@ -190,6 +244,15 @@ async function handleDelete(database, req, res) {
 
     if (!collectionPath || !firebaseKey) {
         return res.status(400).json({ error: 'Invalid delete target' });
+    }
+
+    if (collection === 'leads') {
+        const snapshot = await database.ref(`${collectionPath}/${firebaseKey}`).once('value');
+        const lead = snapshot.val() || {};
+        const username = lead.instagramUsernameKey || extractInstagramUsername(lead.instagramLink);
+        if (username) {
+            await database.ref(`leadOutreach/leadInstagramIndex/${createInstagramIndexKey(username)}`).remove();
+        }
     }
 
     await database.ref(`${collectionPath}/${firebaseKey}`).remove();

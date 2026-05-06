@@ -21,7 +21,10 @@ class LeadOutreachBoard {
         this.leads = [];
         this.pages = [];
         this.messages = [];
+        this.channels = [];
         this.pendingDiscardKey = '';
+        this.pendingContactKey = '';
+        this.pendingContactButton = null;
         this.toastTimer = null;
         this.refreshTimer = null;
 
@@ -45,8 +48,12 @@ class LeadOutreachBoard {
         this.pageForm = document.getElementById('pageForm');
         this.pageMessage = document.getElementById('pageMessage');
         this.discardSheet = document.getElementById('discardSheet');
+        this.contactChannelSheet = document.getElementById('contactChannelSheet');
+        this.contactChannelOptions = document.getElementById('contactChannelOptions');
         this.clipboardDrawer = document.getElementById('clipboardDrawer');
         this.messageForm = document.getElementById('messageForm');
+        this.channelsDrawer = document.getElementById('channelsDrawer');
+        this.channelForm = document.getElementById('channelForm');
     }
 
     setupEvents() {
@@ -58,6 +65,7 @@ class LeadOutreachBoard {
         this.pageFilter.addEventListener('change', () => this.renderPages());
         this.pageForm.addEventListener('submit', (event) => this.handleAddPage(event));
         this.messageForm.addEventListener('submit', (event) => this.handleAddMessage(event));
+        this.channelForm.addEventListener('submit', (event) => this.handleAddChannel(event));
 
         document.querySelectorAll('[data-tab]').forEach((button) => {
             button.addEventListener('click', () => this.setActiveTab(button.dataset.tab));
@@ -70,8 +78,17 @@ class LeadOutreachBoard {
             if (action) this.handleDiscard(action.dataset.discard);
         });
 
+        document.getElementById('contactChannelCancel').addEventListener('click', () => this.closeContactChannelSheet());
+        this.contactChannelSheet.addEventListener('click', (event) => {
+            if (event.target === this.contactChannelSheet) this.closeContactChannelSheet();
+            const action = event.target.closest('[data-channel-key]');
+            if (action) this.confirmLeadContacted(action.dataset.channelKey);
+        });
+
         document.getElementById('clipboardBtn').addEventListener('click', () => this.openClipboard());
         document.getElementById('clipboardClose').addEventListener('click', () => this.closeClipboard());
+        document.getElementById('channelsBtn').addEventListener('click', () => this.openChannels());
+        document.getElementById('channelsClose').addEventListener('click', () => this.closeChannels());
     }
 
     setupAuthListener() {
@@ -141,6 +158,7 @@ class LeadOutreachBoard {
             this.leads = result.leads || [];
             this.pages = result.pages || [];
             this.messages = result.clipboardMessages || [];
+            this.channels = result.channels || [];
             this.render();
         } catch (error) {
             console.error('Lead outreach load failed:', error);
@@ -194,6 +212,7 @@ class LeadOutreachBoard {
         this.renderPages();
         this.renderContactedLeads();
         this.renderClipboard();
+        this.renderChannels();
     }
 
     setActiveTab(tabId) {
@@ -275,6 +294,9 @@ class LeadOutreachBoard {
         const youtubeDisplay = this.extractYouTubeDisplay(lead.youtubeLink);
         const date = this.formatDate(lead.createdAt || lead.submittedAtIso);
         const statusLabel = this.formatStatus(status);
+        const channelLine = lead.outreachChannelName
+            ? `<span class="lead-subitem">via ${this.escapeHtml(lead.outreachChannelName)}</span>`
+            : '';
         const youtubeLine = youtubeDisplay
             ? `<span class="lead-subitem">${this.escapeHtml(youtubeDisplay)}</span>`
             : '';
@@ -297,6 +319,7 @@ class LeadOutreachBoard {
                     </div>
                     <div class="lead-meta">
                         <span>${this.escapeHtml(date)}</span>
+                        ${channelLine}
                         ${youtubeLine}
                     </div>
                     <div class="platform-actions">
@@ -327,6 +350,42 @@ class LeadOutreachBoard {
     }
 
     async markLeadContacted(firebaseKey, button) {
+        const activeChannels = this.getActiveChannels();
+        if (activeChannels.length === 0) {
+            this.showToast('Add an outreach channel first.');
+            this.openChannels();
+            return;
+        }
+
+        this.pendingContactKey = firebaseKey;
+        this.pendingContactButton = button;
+        this.renderContactChannelOptions();
+        this.contactChannelSheet.hidden = false;
+    }
+
+    closeContactChannelSheet() {
+        this.pendingContactKey = '';
+        this.pendingContactButton = null;
+        this.contactChannelSheet.hidden = true;
+    }
+
+    renderContactChannelOptions() {
+        const activeChannels = this.getActiveChannels();
+        this.contactChannelOptions.innerHTML = activeChannels.map((channel) => `
+            <button type="button" class="sheet-action" data-channel-key="${this.escapeAttribute(channel.firebaseKey)}">
+                ${this.escapeHtml(channel.name || 'Unnamed channel')}
+            </button>
+        `).join('');
+    }
+
+    async confirmLeadContacted(channelKey) {
+        const firebaseKey = this.pendingContactKey;
+        const button = this.pendingContactButton;
+        const channel = this.channels.find((item) => item.firebaseKey === channelKey);
+
+        if (!firebaseKey || !channel) return;
+
+        this.closeContactChannelSheet();
         this.setButtonBusy(button, true, '...');
         try {
             await this.apiRequest('PATCH', {
@@ -334,7 +393,9 @@ class LeadOutreachBoard {
                 firebaseKey,
                 updates: {
                     leadStatus: 'contacted',
-                    contactedAt: SERVER_TIMESTAMP
+                    contactedAt: SERVER_TIMESTAMP,
+                    outreachChannelId: channel.firebaseKey,
+                    outreachChannelName: channel.name || ''
                 }
             });
             await this.loadDashboardData();
@@ -539,6 +600,92 @@ class LeadOutreachBoard {
     closeClipboard() {
         this.clipboardDrawer.classList.remove('open');
         this.clipboardDrawer.setAttribute('aria-hidden', 'true');
+    }
+
+    openChannels() {
+        this.channelsDrawer.classList.add('open');
+        this.channelsDrawer.setAttribute('aria-hidden', 'false');
+    }
+
+    closeChannels() {
+        this.channelsDrawer.classList.remove('open');
+        this.channelsDrawer.setAttribute('aria-hidden', 'true');
+    }
+
+    getActiveChannels() {
+        return this.channels
+            .filter((channel) => channel.isActive !== false)
+            .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    }
+
+    async handleAddChannel(event) {
+        event.preventDefault();
+        const input = document.getElementById('channelName');
+        const message = document.getElementById('channelMessage');
+        const button = this.channelForm.querySelector('button[type="submit"]');
+        const name = input.value.trim();
+
+        this.setButtonBusy(button, true, 'Adding...');
+        this.setMessage(message, '', '');
+
+        try {
+            await this.apiRequest('POST', {
+                collection: 'channels',
+                data: { name }
+            });
+            input.value = '';
+            await this.loadDashboardData();
+            this.setMessage(message, 'Channel added.', 'success');
+        } catch (error) {
+            console.error('Add channel failed:', error);
+            this.setMessage(message, error.message || 'Could not add channel.', 'error');
+        } finally {
+            this.setButtonBusy(button, false);
+        }
+    }
+
+    renderChannels() {
+        const list = document.getElementById('channelList');
+        const empty = document.getElementById('channelEmpty');
+        const channels = this.getActiveChannels();
+
+        list.innerHTML = channels.map((channel) => `
+            <article class="message-card channel-card" data-key="${this.escapeAttribute(channel.firebaseKey)}">
+                <div class="message-title">
+                    <strong>${this.escapeHtml(channel.name || 'Unnamed channel')}</strong>
+                    <button class="mini-btn danger" type="button" data-channel-action="delete" data-key="${this.escapeAttribute(channel.firebaseKey)}">Delete</button>
+                </div>
+            </article>
+        `).join('');
+
+        empty.classList.toggle('visible', channels.length === 0);
+        this.bindChannelButtons(list);
+    }
+
+    bindChannelButtons(container) {
+        container.querySelectorAll('[data-channel-action]').forEach((button) => {
+            button.addEventListener('click', async () => {
+                if (button.dataset.channelAction === 'delete') {
+                    await this.deleteChannel(button.dataset.key);
+                }
+            });
+        });
+    }
+
+    async deleteChannel(firebaseKey) {
+        if (!window.confirm('Delete this outreach channel? Existing contacted leads will keep the saved channel name.')) return;
+
+        try {
+            await this.apiRequest('DELETE', {
+                collection: 'channels',
+                firebaseKey
+            });
+            await this.loadDashboardData();
+            this.showToast('Channel deleted.');
+        } catch (error) {
+            console.error('Delete channel failed:', error);
+            this.showToast('Could not delete channel.');
+        }
     }
 
     async handleAddMessage(event) {
