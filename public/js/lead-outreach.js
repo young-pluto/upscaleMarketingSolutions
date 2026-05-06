@@ -86,7 +86,6 @@ class LeadOutreachBoard {
     }
 
     setupAuthListener() {
-        this.setBusy(true);
         onAuthStateChanged(auth, (user) => {
             this.currentUser = user;
             if (!user) {
@@ -96,6 +95,7 @@ class LeadOutreachBoard {
             }
 
             this.showApp();
+            this.setBusy(true);
             this.attachRealtimeListeners();
         });
     }

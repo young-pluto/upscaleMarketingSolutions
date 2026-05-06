@@ -31,6 +31,10 @@ body {
     letter-spacing: 0;
 }
 
+[hidden] {
+    display: none !important;
+}
+
 button,
 input,
 select,
