@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Lead Outreach Form</title>
+    <link rel="stylesheet" href="/css/lead-outreach.css">
+</head>
+<body class="form-page">
+    <main class="submission-shell">
+        <header class="submission-header">
+            <p class="eyebrow">Lead Outreach</p>
+            <h1>Submit a lead or page</h1>
+        </header>
+
+        <nav class="tab-bar form-tabs" aria-label="Submission type">
+            <button class="tab-btn active" type="button" data-form-tab="lead">Client</button>
+            <button class="tab-btn" type="button" data-form-tab="page">Page</button>
+        </nav>
+
+        <section id="leadFormPanel" class="submission-panel active">
+            <form id="leadSubmissionForm" class="submission-form">
+                <label for="instagramLink">Instagram link</label>
+                <input id="instagramLink" type="url" placeholder="https://instagram.com/client" required>
+
+                <label for="youtubeLink">YouTube link</label>
+                <input id="youtubeLink" type="url" placeholder="https://youtube.com/..." aria-describedby="youtubeHelp">
+                <small id="youtubeHelp">Optional</small>
+
+                <button type="submit" id="leadSubmitBtn" class="primary-btn">Submit client</button>
+                <p id="leadFormMessage" class="form-message"></p>
+            </form>
+        </section>
+
+        <section id="pageFormPanel" class="submission-panel">
+            <form id="pageSubmissionForm" class="submission-form">
+                <label for="pageInstagramLink">Instagram URL</label>
+                <input id="pageInstagramLink" type="url" placeholder="https://instagram.com/sourcepage" required>
+
+                <button type="submit" id="pageSubmitBtn" class="primary-btn">Submit page</button>
+                <p id="pageFormMessage" class="form-message"></p>
+            </form>
+        </section>
+    </main>
+
+    <script type="module" src="/js/lead-outreach-form.js"></script>
+</body>
+</html>

@@ -34,12 +34,12 @@
       "destination": "/campaign-progress.html"
     },
     {
-      "source": "/lead-outreach",
-      "destination": "/lead-outreach.html"
+      "source": "/lead-outreach/form",
+      "destination": "/lead-outreach/form.html"
     },
     {
-      "source": "/lead-outreach/form",
-      "destination": "/lead-outreach-form.html"
+      "source": "/lead-outreach",
+      "destination": "/lead-outreach.html"
     },
     {
       "source": "/admin",

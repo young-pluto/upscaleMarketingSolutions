@@ -68,7 +68,7 @@ app.get('/lead-outreach', (req, res) => {
 });
 
 app.get('/lead-outreach/form', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'lead-outreach-form.html'));
+    res.sendFile(path.join(__dirname, 'public', 'lead-outreach', 'form.html'));
 });
 
 app.get('/index.html', (req, res) => {
