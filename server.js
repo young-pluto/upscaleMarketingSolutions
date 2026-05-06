@@ -25,6 +25,7 @@ import getOrders from './api/get-orders.js';
 import getOrder from './api/get-order.js';
 import submitTrialCampaign from './api/submit-trial-campaign.js';
 import getTrialCampaigns from './api/get-trial-campaigns.js';
+import submitLeadOutreach from './api/submit-lead-outreach.js';
 
 // API routes
 app.post('/api/create-order', createOrder);
@@ -34,6 +35,8 @@ app.get('/api/get-orders', getOrders);
 app.get('/api/get-order', getOrder);
 app.post('/api/submit-trial-campaign', submitTrialCampaign);
 app.get('/api/get-trial-campaigns', getTrialCampaigns);
+app.options('/api/submit-lead-outreach', submitLeadOutreach);
+app.post('/api/submit-lead-outreach', submitLeadOutreach);
 
 // Serve static files - ROUTES FIRST
 app.get('/', (req, res) => {
@@ -58,6 +61,14 @@ app.get('/trial-campaign-success', (req, res) => {
 
 app.get('/campaign-progress', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'campaign-progress.html'));
+});
+
+app.get('/lead-outreach', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'lead-outreach.html'));
+});
+
+app.get('/lead-outreach/form', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'lead-outreach-form.html'));
 });
 
 app.get('/index.html', (req, res) => {

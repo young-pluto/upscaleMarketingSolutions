@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Lead Outreach Board</title>
+    <link rel="stylesheet" href="/css/lead-outreach.css">
+</head>
+<body>
+    <div id="authScreen" class="auth-screen">
+        <form id="loginForm" class="auth-card">
+            <p class="eyebrow">Internal access</p>
+            <h1>Lead Outreach</h1>
+            <label for="adminEmail">Email</label>
+            <input type="email" id="adminEmail" autocomplete="email" required>
+            <label for="adminPassword">Password</label>
+            <input type="password" id="adminPassword" autocomplete="current-password" required>
+            <button type="submit" id="loginBtn" class="primary-btn">Sign in</button>
+            <p id="loginError" class="form-message error"></p>
+        </form>
+    </div>
+
+    <div id="appShell" class="app-shell" hidden>
+        <header class="app-header">
+            <div>
+                <p class="eyebrow">Protected workspace</p>
+                <h1>Lead Outreach</h1>
+            </div>
+            <div class="header-actions">
+                <button id="clipboardBtn" class="icon-btn" type="button" aria-label="Open clipboard">
+                    <span class="icon-clip"></span>
+                    <span class="clipboard-count" id="clipboardCount">0</span>
+                </button>
+                <button id="logoutBtn" class="ghost-btn" type="button">Logout</button>
+            </div>
+        </header>
+
+        <main class="main-shell">
+            <section class="analytics-panel" aria-label="Lead analytics">
+                <div class="analytics-header">
+                    <div>
+                        <h2>Analytics</h2>
+                        <p id="analyticsCaption">Live totals from all stored lead records</p>
+                    </div>
+                    <select id="analyticsFilter" aria-label="Filter analytics range">
+                        <option value="all">All time</option>
+                        <option value="7">Last 7 days</option>
+                        <option value="30">Last 30 days</option>
+                        <option value="90">Last 90 days</option>
+                    </select>
+                </div>
+                <div class="metric-grid">
+                    <article class="metric-card">
+                        <span>Total</span>
+                        <strong id="metricTotal">0</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>New</span>
+                        <strong id="metricNew">0</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Contacted</span>
+                        <strong id="metricContacted">0</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Converted</span>
+                        <strong id="metricConverted">0</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Not useful</span>
+                        <strong id="metricNotUseful">0</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Not relevant</span>
+                        <strong id="metricNotRelevant">0</strong>
+                    </article>
+                </div>
+            </section>
+
+            <nav class="tab-bar" aria-label="Lead outreach sections">
+                <button class="tab-btn active" type="button" data-tab="new">New Leads <span id="newBadge">0</span></button>
+                <button class="tab-btn" type="button" data-tab="pages">Pages <span id="pagesBadge">0</span></button>
+                <button class="tab-btn" type="button" data-tab="contacted">Contacted <span id="contactedBadge">0</span></button>
+            </nav>
+
+            <section id="newPanel" class="tab-panel active">
+                <div class="panel-toolbar">
+                    <div>
+                        <h2>New Leads</h2>
+                        <p>Tap a lead to open it. Use the contact button when outreach is done.</p>
+                    </div>
+                    <select id="newSort" aria-label="Sort new leads">
+                        <option value="newest">New to old</option>
+                        <option value="oldest">Old to new</option>
+                    </select>
+                </div>
+                <div id="newLeadsList" class="item-list"></div>
+                <div id="newEmpty" class="empty-state">No new leads right now.</div>
+            </section>
+
+            <section id="pagesPanel" class="tab-panel">
+                <form id="pageForm" class="inline-form">
+                    <label for="pageInstagramUrl">Add page</label>
+                    <div class="form-row">
+                        <input id="pageInstagramUrl" type="url" placeholder="https://instagram.com/page" required>
+                        <button type="submit" class="primary-btn">Add</button>
+                    </div>
+                    <p id="pageMessage" class="form-message"></p>
+                </form>
+                <div class="panel-toolbar compact">
+                    <div>
+                        <h2>Pages</h2>
+                        <p>Mark heavily used pages so the team can avoid stale sources.</p>
+                    </div>
+                    <select id="pageFilter" aria-label="Filter pages">
+                        <option value="all">All pages</option>
+                        <option value="active">Active only</option>
+                        <option value="exhausted">Used only</option>
+                    </select>
+                </div>
+                <div id="pagesList" class="item-list"></div>
+                <div id="pagesEmpty" class="empty-state">No pages saved yet.</div>
+            </section>
+
+            <section id="contactedPanel" class="tab-panel">
+                <div class="panel-toolbar">
+                    <div>
+                        <h2>Contacted</h2>
+                        <p>Converted leads feed the analytics dashboard.</p>
+                    </div>
+                    <select id="contactedSort" aria-label="Sort contacted leads">
+                        <option value="newest">Recently contacted</option>
+                        <option value="oldest">Oldest contacted</option>
+                    </select>
+                </div>
+                <div id="contactedList" class="item-list"></div>
+                <div id="contactedEmpty" class="empty-state">No contacted leads yet.</div>
+            </section>
+        </main>
+    </div>
+
+    <div id="busyOverlay" class="busy-overlay" hidden>
+        <div class="spinner"></div>
+    </div>
+
+    <div id="discardSheet" class="sheet-backdrop" hidden>
+        <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="discardTitle">
+            <h2 id="discardTitle">Remove lead?</h2>
+            <p>Choose whether this should affect analytics or simply disappear.</p>
+            <button type="button" class="sheet-action" data-discard="not_useful">Mark not useful</button>
+            <button type="button" class="sheet-action" data-discard="not_relevant">Mark not relevant</button>
+            <button type="button" class="sheet-action danger" data-discard="delete">Delete only</button>
+            <button type="button" class="sheet-cancel" id="discardCancel">Cancel</button>
+        </section>
+    </div>
+
+    <aside id="clipboardDrawer" class="drawer" aria-hidden="true">
+        <div class="drawer-header">
+            <div>
+                <p class="eyebrow">Clipboard</p>
+                <h2>Saved Messages</h2>
+            </div>
+            <button id="clipboardClose" class="icon-btn" type="button" aria-label="Close clipboard">x</button>
+        </div>
+        <form id="messageForm" class="message-form">
+            <input id="messageTitle" type="text" placeholder="Title" maxlength="80" required>
+            <textarea id="messageBody" rows="4" placeholder="Write a reusable message..." required></textarea>
+            <button type="submit" class="primary-btn">Add message</button>
+            <p id="clipboardMessage" class="form-message"></p>
+        </form>
+        <div id="messageList" class="message-list"></div>
+        <div id="messageEmpty" class="empty-state">No saved messages yet.</div>
+    </aside>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="/js/lead-outreach.js"></script>
+</body>
+</html>
