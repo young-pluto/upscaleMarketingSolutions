@@ -1,19 +1,12 @@
-import { auth, database } from './firebase-config.js';
+import { auth } from './firebase-config.js';
 import {
     signInWithEmailAndPassword,
     signOut,
     onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-import {
-    ref,
-    onValue,
-    push,
-    update,
-    remove,
-    serverTimestamp
-} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 
-const MODULE_ROOT = 'leadOutreach';
+const ADMIN_API_URL = '/api/lead-outreach-admin';
+const SERVER_TIMESTAMP = '__SERVER_TIMESTAMP__';
 
 const TABS = [
     { id: 'new', label: 'New Leads' },
@@ -28,13 +21,9 @@ class LeadOutreachBoard {
         this.leads = [];
         this.pages = [];
         this.messages = [];
-        this.listenersReady = {
-            leads: false,
-            pages: false,
-            messages: false
-        };
         this.pendingDiscardKey = '';
         this.toastTimer = null;
+        this.refreshTimer = null;
 
         this.cacheElements();
         this.setupEvents();
@@ -86,17 +75,19 @@ class LeadOutreachBoard {
     }
 
     setupAuthListener() {
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
             this.currentUser = user;
             if (!user) {
                 this.showLogin();
                 this.setBusy(false);
+                this.stopAutoRefresh();
                 return;
             }
 
             this.showApp();
             this.setBusy(true);
-            this.attachRealtimeListeners();
+            await this.loadDashboardData();
+            this.startAutoRefresh();
         });
     }
 
@@ -142,53 +133,58 @@ class LeadOutreachBoard {
         }
     }
 
-    attachRealtimeListeners() {
-        onValue(ref(database, `${MODULE_ROOT}/leads`), (snapshot) => {
-            this.leads = this.snapshotToArray(snapshot);
-            this.listenersReady.leads = true;
+    async loadDashboardData({ showLoader = false } = {}) {
+        if (showLoader) this.setBusy(true);
+
+        try {
+            const result = await this.apiRequest('GET');
+            this.leads = result.leads || [];
+            this.pages = result.pages || [];
+            this.messages = result.clipboardMessages || [];
             this.render();
-            this.stopInitialBusyWhenReady();
-        }, (error) => this.handleRealtimeError(error));
-
-        onValue(ref(database, `${MODULE_ROOT}/pages`), (snapshot) => {
-            this.pages = this.snapshotToArray(snapshot);
-            this.listenersReady.pages = true;
-            this.render();
-            this.stopInitialBusyWhenReady();
-        }, (error) => this.handleRealtimeError(error));
-
-        onValue(ref(database, `${MODULE_ROOT}/clipboardMessages`), (snapshot) => {
-            this.messages = this.snapshotToArray(snapshot);
-            this.listenersReady.messages = true;
-            this.renderClipboard();
-            this.stopInitialBusyWhenReady();
-        }, (error) => this.handleRealtimeError(error));
-    }
-
-    stopInitialBusyWhenReady() {
-        if (Object.values(this.listenersReady).every(Boolean)) {
+        } catch (error) {
+            console.error('Lead outreach load failed:', error);
+            this.showToast(error.message || 'Could not load dashboard data.');
+        } finally {
             this.setBusy(false);
         }
     }
 
-    handleRealtimeError(error) {
-        console.error('Lead outreach realtime error:', error);
-        this.setBusy(false);
-        this.showToast('Could not load live data. Check Firebase access.');
+    startAutoRefresh() {
+        this.stopAutoRefresh();
+        this.refreshTimer = window.setInterval(() => {
+            if (!this.currentUser || document.hidden) return;
+            this.loadDashboardData();
+        }, 20000);
     }
 
-    snapshotToArray(snapshot) {
-        const items = [];
-        if (!snapshot.exists()) return items;
+    stopAutoRefresh() {
+        if (!this.refreshTimer) return;
+        window.clearInterval(this.refreshTimer);
+        this.refreshTimer = null;
+    }
 
-        snapshot.forEach((child) => {
-            items.push({
-                firebaseKey: child.key,
-                ...child.val()
-            });
+    async apiRequest(method, payload = null) {
+        if (!this.currentUser) {
+            throw new Error('Please sign in again.');
+        }
+
+        const token = await this.currentUser.getIdToken();
+        const response = await fetch(ADMIN_API_URL, {
+            method,
+            headers: {
+                Authorization: `Bearer ${token}`,
+                ...(payload ? { 'Content-Type': 'application/json' } : {})
+            },
+            body: payload ? JSON.stringify(payload) : undefined
         });
 
-        return items;
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || result.error || 'Request failed.');
+        }
+
+        return result;
     }
 
     render() {
@@ -318,12 +314,15 @@ class LeadOutreachBoard {
     async markLeadContacted(firebaseKey, button) {
         this.setButtonBusy(button, true, '...');
         try {
-            await update(ref(database, `${MODULE_ROOT}/leads/${firebaseKey}`), {
-                leadStatus: 'contacted',
-                contactedAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-                contactedBy: this.currentUser?.email || ''
+            await this.apiRequest('PATCH', {
+                collection: 'leads',
+                firebaseKey,
+                updates: {
+                    leadStatus: 'contacted',
+                    contactedAt: SERVER_TIMESTAMP
+                }
             });
+            await this.loadDashboardData();
             this.showToast('Lead moved to Contacted.');
         } catch (error) {
             console.error('Mark contacted failed:', error);
@@ -336,12 +335,15 @@ class LeadOutreachBoard {
     async markLeadConverted(firebaseKey, button) {
         this.setButtonBusy(button, true, '...');
         try {
-            await update(ref(database, `${MODULE_ROOT}/leads/${firebaseKey}`), {
-                leadStatus: 'converted',
-                convertedAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-                convertedBy: this.currentUser?.email || ''
+            await this.apiRequest('PATCH', {
+                collection: 'leads',
+                firebaseKey,
+                updates: {
+                    leadStatus: 'converted',
+                    convertedAt: SERVER_TIMESTAMP
+                }
             });
+            await this.loadDashboardData();
             this.showToast('Lead marked converted.');
         } catch (error) {
             console.error('Mark converted failed:', error);
@@ -369,18 +371,24 @@ class LeadOutreachBoard {
             if (action === 'delete') {
                 const confirmed = window.confirm('Delete this lead without registering it in analytics?');
                 if (!confirmed) return;
-                await remove(ref(database, `${MODULE_ROOT}/leads/${firebaseKey}`));
+                await this.apiRequest('DELETE', {
+                    collection: 'leads',
+                    firebaseKey
+                });
                 this.showToast('Lead deleted.');
             } else {
-                await update(ref(database, `${MODULE_ROOT}/leads/${firebaseKey}`), {
-                    leadStatus: 'discarded',
-                    discardReason: action,
-                    discardedAt: serverTimestamp(),
-                    updatedAt: serverTimestamp(),
-                    discardedBy: this.currentUser?.email || ''
+                await this.apiRequest('PATCH', {
+                    collection: 'leads',
+                    firebaseKey,
+                    updates: {
+                        leadStatus: 'discarded',
+                        discardReason: action,
+                        discardedAt: SERVER_TIMESTAMP
+                    }
                 });
                 this.showToast(action === 'not_useful' ? 'Marked not useful.' : 'Marked not relevant.');
             }
+            await this.loadDashboardData();
         } catch (error) {
             console.error('Discard lead failed:', error);
             this.showToast('Could not remove lead.');
@@ -399,17 +407,14 @@ class LeadOutreachBoard {
         this.setButtonBusy(button, true, 'Adding...');
 
         try {
-            await push(ref(database, `${MODULE_ROOT}/pages`), {
-                instagramUrl,
-                source: 'lead-outreach-board',
-                pageStatus: 'active',
-                isExhausted: false,
-                notes: '',
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-                createdBy: this.currentUser?.email || ''
+            await this.apiRequest('POST', {
+                collection: 'pages',
+                data: {
+                    instagramUrl
+                }
             });
             input.value = '';
+            await this.loadDashboardData();
             this.setMessage(this.pageMessage, 'Page added.', 'success');
         } catch (error) {
             console.error('Add page failed:', error);
@@ -474,13 +479,16 @@ class LeadOutreachBoard {
 
     async togglePageExhausted(firebaseKey, isExhausted) {
         try {
-            await update(ref(database, `${MODULE_ROOT}/pages/${firebaseKey}`), {
-                isExhausted,
-                pageStatus: isExhausted ? 'exhausted' : 'active',
-                exhaustedAt: isExhausted ? serverTimestamp() : null,
-                updatedAt: serverTimestamp(),
-                updatedBy: this.currentUser?.email || ''
+            await this.apiRequest('PATCH', {
+                collection: 'pages',
+                firebaseKey,
+                updates: {
+                    isExhausted,
+                    pageStatus: isExhausted ? 'exhausted' : 'active',
+                    exhaustedAt: isExhausted ? SERVER_TIMESTAMP : null
+                }
             });
+            await this.loadDashboardData();
         } catch (error) {
             console.error('Toggle page failed:', error);
             this.showToast('Could not update page.');
@@ -490,7 +498,11 @@ class LeadOutreachBoard {
     async deletePage(firebaseKey) {
         if (!window.confirm('Delete this page from the outreach list?')) return;
         try {
-            await remove(ref(database, `${MODULE_ROOT}/pages/${firebaseKey}`));
+            await this.apiRequest('DELETE', {
+                collection: 'pages',
+                firebaseKey
+            });
+            await this.loadDashboardData();
             this.showToast('Page deleted.');
         } catch (error) {
             console.error('Delete page failed:', error);
@@ -518,15 +530,16 @@ class LeadOutreachBoard {
         this.setMessage(document.getElementById('clipboardMessage'), '', '');
 
         try {
-            await push(ref(database, `${MODULE_ROOT}/clipboardMessages`), {
-                title: titleInput.value.trim(),
-                body: bodyInput.value.trim(),
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-                createdBy: this.currentUser?.email || ''
+            await this.apiRequest('POST', {
+                collection: 'clipboardMessages',
+                data: {
+                    title: titleInput.value.trim(),
+                    body: bodyInput.value.trim()
+                }
             });
             titleInput.value = '';
             bodyInput.value = '';
+            await this.loadDashboardData();
             this.setMessage(document.getElementById('clipboardMessage'), 'Message added.', 'success');
         } catch (error) {
             console.error('Add message failed:', error);
@@ -607,7 +620,11 @@ class LeadOutreachBoard {
     async deleteMessage(firebaseKey) {
         if (!window.confirm('Delete this saved message?')) return;
         try {
-            await remove(ref(database, `${MODULE_ROOT}/clipboardMessages/${firebaseKey}`));
+            await this.apiRequest('DELETE', {
+                collection: 'clipboardMessages',
+                firebaseKey
+            });
+            await this.loadDashboardData();
             this.showToast('Message deleted.');
         } catch (error) {
             console.error('Delete message failed:', error);

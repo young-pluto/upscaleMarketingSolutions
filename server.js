@@ -26,6 +26,7 @@ import getOrder from './api/get-order.js';
 import submitTrialCampaign from './api/submit-trial-campaign.js';
 import getTrialCampaigns from './api/get-trial-campaigns.js';
 import submitLeadOutreach from './api/submit-lead-outreach.js';
+import leadOutreachAdmin from './api/lead-outreach-admin.js';
 
 // API routes
 app.post('/api/create-order', createOrder);
@@ -37,6 +38,11 @@ app.post('/api/submit-trial-campaign', submitTrialCampaign);
 app.get('/api/get-trial-campaigns', getTrialCampaigns);
 app.options('/api/submit-lead-outreach', submitLeadOutreach);
 app.post('/api/submit-lead-outreach', submitLeadOutreach);
+app.options('/api/lead-outreach-admin', leadOutreachAdmin);
+app.get('/api/lead-outreach-admin', leadOutreachAdmin);
+app.post('/api/lead-outreach-admin', leadOutreachAdmin);
+app.patch('/api/lead-outreach-admin', leadOutreachAdmin);
+app.delete('/api/lead-outreach-admin', leadOutreachAdmin);
 
 // Serve static files - ROUTES FIRST
 app.get('/', (req, res) => {
