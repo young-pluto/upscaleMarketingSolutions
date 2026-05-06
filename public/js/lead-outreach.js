@@ -269,29 +269,44 @@ class LeadOutreachBoard {
 
     renderLeadCard(lead, context) {
         const status = lead.leadStatus || 'new';
-        const primaryUrl = this.safeUrl(lead.instagramLink);
+        const instagramUrl = this.safeUrl(lead.instagramLink);
+        const youtubeUrl = lead.youtubeLink ? this.safeUrl(lead.youtubeLink) : '#';
+        const instagramUsername = this.extractInstagramUsername(lead.instagramLink);
+        const youtubeDisplay = this.extractYouTubeDisplay(lead.youtubeLink);
         const date = this.formatDate(lead.createdAt || lead.submittedAtIso);
-        const youtube = lead.youtubeLink
-            ? `<div class="lead-meta">YouTube: ${this.escapeHtml(this.truncateUrl(lead.youtubeLink))}</div>`
+        const statusLabel = this.formatStatus(status);
+        const youtubeLine = youtubeDisplay
+            ? `<span class="lead-subitem">${this.escapeHtml(youtubeDisplay)}</span>`
             : '';
-        const convertedAction = context === 'contacted' && status !== 'converted'
-            ? `<button class="chip-btn convert" type="button" title="Mark converted" data-action="convert" data-key="${this.escapeAttribute(lead.firebaseKey)}">$</button>`
+        const primaryAction = context === 'new'
+            ? `<button class="quick-action primary" type="button" data-action="contact" data-key="${this.escapeAttribute(lead.firebaseKey)}">Contacted</button>`
+            : status === 'converted'
+                ? `<span class="quick-action done">Converted</span>`
+                : `<button class="quick-action primary" type="button" data-action="convert" data-key="${this.escapeAttribute(lead.firebaseKey)}">Converted</button>`;
+        const youtubeButton = youtubeDisplay && youtubeUrl !== '#'
+            ? `<a class="platform-btn youtube" href="${youtubeUrl}" target="_blank" rel="noopener noreferrer" aria-label="Open YouTube">YT</a>`
             : '';
 
         return `
             <article class="lead-card" data-key="${this.escapeAttribute(lead.firebaseKey)}">
-                <a class="lead-open" href="${primaryUrl}" target="_blank" rel="noopener noreferrer">
+                <div class="lead-avatar" aria-hidden="true">${this.escapeHtml(this.getAvatarInitial(instagramUsername))}</div>
+                <div class="lead-main">
                     <div class="lead-title">
-                        <strong>${this.escapeHtml(this.truncateUrl(lead.instagramLink))}</strong>
-                        <span class="status-pill ${this.escapeAttribute(status)}">${this.escapeHtml(this.formatStatus(status))}</span>
+                        <strong>${this.escapeHtml(instagramUsername)}</strong>
+                        <span class="status-dot ${this.escapeAttribute(status)}">${this.escapeHtml(statusLabel)}</span>
                     </div>
-                    <div class="lead-meta">${this.escapeHtml(lead.leadId || 'Lead')} · ${this.escapeHtml(date)}</div>
-                    ${youtube}
-                </a>
+                    <div class="lead-meta">
+                        <span>${this.escapeHtml(date)}</span>
+                        ${youtubeLine}
+                    </div>
+                    <div class="platform-actions">
+                        <a class="platform-btn instagram" href="${instagramUrl}" target="_blank" rel="noopener noreferrer" aria-label="Open Instagram">IG</a>
+                        ${youtubeButton}
+                    </div>
+                </div>
                 <div class="lead-actions">
-                    ${context === 'new' ? `<button class="chip-btn contact" type="button" title="Mark contacted" data-action="contact" data-key="${this.escapeAttribute(lead.firebaseKey)}">✓</button>` : ''}
-                    ${convertedAction}
-                    <button class="chip-btn delete" type="button" title="Remove lead" data-action="discard" data-key="${this.escapeAttribute(lead.firebaseKey)}">x</button>
+                    ${primaryAction}
+                    <button class="quick-action secondary" type="button" data-action="discard" data-key="${this.escapeAttribute(lead.firebaseKey)}">Skip</button>
                 </div>
             </article>
         `;
@@ -436,20 +451,26 @@ class LeadOutreachBoard {
 
         list.innerHTML = pages.map((page) => {
             const exhausted = Boolean(page.isExhausted);
+            const instagramUsername = this.extractInstagramUsername(page.instagramUrl);
             return `
-                <article class="page-card ${exhausted ? 'exhausted' : ''}" data-key="${this.escapeAttribute(page.firebaseKey)}">
-                    <div class="page-title">
-                        <strong>${this.escapeHtml(this.truncateUrl(page.instagramUrl))}</strong>
-                        <span class="status-pill ${exhausted ? 'exhausted' : 'active'}">${exhausted ? 'Used' : 'Active'}</span>
+                <article class="page-card source-card ${exhausted ? 'exhausted' : ''}" data-key="${this.escapeAttribute(page.firebaseKey)}">
+                    <div class="source-main">
+                        <div class="source-avatar" aria-hidden="true">#</div>
+                        <div class="source-copy">
+                            <div class="page-title">
+                                <strong>${this.escapeHtml(instagramUsername)}</strong>
+                                <span class="status-dot ${exhausted ? 'exhausted' : 'active'}">${exhausted ? 'Used' : 'Active'}</span>
+                            </div>
+                            <div class="page-meta">Source page · ${this.escapeHtml(this.formatDate(page.createdAt || page.submittedAtIso))}</div>
+                        </div>
                     </div>
-                    <div class="page-meta">${this.escapeHtml(page.pageId || 'Page')} · ${this.escapeHtml(this.formatDate(page.createdAt || page.submittedAtIso))}</div>
                     <div class="page-actions">
                         <label class="toggle-row">
                             <input type="checkbox" ${exhausted ? 'checked' : ''} data-page-action="toggle" data-key="${this.escapeAttribute(page.firebaseKey)}">
-                            Used/exhausted
+                            Used
                         </label>
                         <div>
-                            <a class="mini-btn" href="${this.safeUrl(page.instagramUrl)}" target="_blank" rel="noopener noreferrer">Open</a>
+                            <a class="platform-btn instagram" href="${this.safeUrl(page.instagramUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open Instagram">IG</a>
                             <button class="mini-btn danger" type="button" data-page-action="delete" data-key="${this.escapeAttribute(page.firebaseKey)}">Delete</button>
                         </div>
                     </div>
@@ -661,6 +682,54 @@ class LeadOutreachBoard {
             discarded: 'Discarded'
         };
         return labels[status] || status || 'New';
+    }
+
+    extractInstagramUsername(value) {
+        const fallback = '@instagram';
+        const rawValue = String(value || '').trim();
+        if (!rawValue) return fallback;
+
+        try {
+            const url = new URL(rawValue);
+            const handle = url.pathname.split('/').filter(Boolean)[0] || '';
+            return handle ? `@${decodeURIComponent(handle).replace(/^@/, '')}` : fallback;
+        } catch (error) {
+            const cleaned = rawValue
+                .replace(/^https?:\/\//, '')
+                .replace(/^www\./, '')
+                .replace(/^instagram\.com\//, '')
+                .split(/[/?#]/)[0]
+                .replace(/^@/, '');
+            return cleaned ? `@${cleaned}` : fallback;
+        }
+    }
+
+    extractYouTubeDisplay(value) {
+        const rawValue = String(value || '').trim();
+        if (!rawValue) return '';
+
+        try {
+            const url = new URL(rawValue);
+            const parts = url.pathname.split('/').filter(Boolean);
+            const handle = parts.find((part) => part.startsWith('@'));
+
+            if (handle) return handle;
+            if (parts[0] === 'channel' && parts[1]) return 'Channel';
+            if (['c', 'user'].includes(parts[0]) && parts[1]) return parts[1];
+            if (url.hostname.includes('youtu.be') || url.searchParams.get('v')) return 'YouTube video';
+            return 'YouTube';
+        } catch (error) {
+            return 'YouTube';
+        }
+    }
+
+    getAvatarInitial(label) {
+        const character = String(label || '')
+            .replace(/^@/, '')
+            .trim()
+            .charAt(0);
+
+        return character ? character.toUpperCase() : 'L';
     }
 
     truncateUrl(value) {
