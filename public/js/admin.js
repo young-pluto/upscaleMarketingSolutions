@@ -109,6 +109,12 @@ class AdminDashboard {
         this.legacyBucket = 'hot';
         this.legacyChannel = '';
 
+        // Detail-view state
+        this.clientDetailId = null;
+        this.clientDetailDirty = false;
+        this.legacyDetailId = null;
+        this.legacyDetailDirty = false;
+
         // Orders UI state
         this.orderStatusTab = 'pending';
         this.orderLimit = 10;
@@ -214,6 +220,25 @@ class AdminDashboard {
         document.getElementById('addChannelBtn').addEventListener('click', () => this.openChannelSheet(null));
         document.getElementById('refreshChannelsBtn').addEventListener('click', () => this.renderChannels());
 
+        // Detail views (client + legacy)
+        document.getElementById('clientDetailBack').addEventListener('click', () => {
+            if (this.clientDetailDirty && !confirm('Discard unsaved changes?')) return;
+            this.clientDetailId = null;
+            this.clientDetailDirty = false;
+            this.switchView('clients');
+        });
+        document.getElementById('clientDetailSave').addEventListener('click', () => this.saveClientDetail());
+        document.getElementById('clientDetailDelete').addEventListener('click', () => this.deleteClientFromDetail());
+
+        document.getElementById('legacyDetailBack').addEventListener('click', () => {
+            if (this.legacyDetailDirty && !confirm('Discard unsaved changes?')) return;
+            this.legacyDetailId = null;
+            this.legacyDetailDirty = false;
+            this.switchView('legacy-clients');
+        });
+        document.getElementById('legacyDetailSave').addEventListener('click', () => this.saveLegacyDetail());
+        document.getElementById('legacyDetailDelete').addEventListener('click', () => this.deleteLegacyFromDetail());
+
         // Orders
         document.getElementById('searchInput').addEventListener('input', () => this.renderOrders());
         document.getElementById('sortBy').addEventListener('change', () => this.renderOrders());
@@ -290,7 +315,9 @@ class AdminDashboard {
         const panels = {
             'orders': 'ordersView',
             'clients': 'clientsView',
+            'client-detail': 'clientDetailView',
             'legacy-clients': 'legacyClientsView',
+            'legacy-detail': 'legacyDetailView',
             'trial-campaigns': 'trialCampaignsView',
             'channels': 'channelsView',
         };
@@ -301,7 +328,9 @@ class AdminDashboard {
         const labelMap = {
             'orders': 'Orders',
             'clients': 'Clients',
+            'client-detail': 'Client',
             'legacy-clients': 'Old Clients',
+            'legacy-detail': 'Old client',
             'trial-campaigns': 'Trial Leads',
             'channels': 'Channels',
         };
@@ -348,6 +377,9 @@ class AdminDashboard {
             this.clients = Object.entries(val).map(([key, data]) => ({ ...data, firebaseKey: key }));
             this.renderClients();
             this.renderOrders(); // re-render so client labels populate
+            if (this.clientDetailId && this.activeView === 'client-detail' && !this.clientDetailDirty) {
+                this.renderClientDetail();
+            }
         }, (err) => {
             console.warn('Realtime clients read failed', err);
         });
@@ -358,6 +390,9 @@ class AdminDashboard {
             const val = snap.val() || {};
             this.legacyClients = Object.entries(val).map(([key, data]) => ({ ...data, firebaseKey: key }));
             this.renderLegacy();
+            if (this.legacyDetailId && this.activeView === 'legacy-detail' && !this.legacyDetailDirty) {
+                this.renderLegacyDetail();
+            }
         }, (err) => console.warn('Realtime legacyClients read failed', err));
         this.unsubscribers.push(offLegacy);
 
@@ -856,8 +891,9 @@ class AdminDashboard {
             const igBtn = igUrl
                 ? `<a class="icon-btn ig" href="${this.safeUrl(igUrl)}" target="_blank" rel="noopener noreferrer" title="${this.escapeAttribute(instagramDisplay(c.instagram))}" aria-label="Open Instagram">◎</a>`
                 : '';
+            const notesExcerpt = c.notes ? this.escapeHtml(this.truncate(c.notes, 90)) : '';
             return `
-            <article class="client-card" data-key="${key}">
+            <article class="client-card clickable-card" data-key="${key}" role="button" tabindex="0">
                 <div class="client-row">
                     <div class="client-primary">
                         <div class="client-name">${this.escapeHtml(c.name)}</div>
@@ -871,12 +907,12 @@ class AdminDashboard {
                             <span class="muted">${this.escapeHtml(recent)}</span>
                             ${c.channel ? `<span class="chip">📡 ${this.escapeHtml(this.channelName(c.channel))}</span>` : ''}
                         </div>
-                        <div class="client-slug muted">/${this.escapeHtml(c.slug || '')}${c.instagram ? ` · <a href="${this.safeUrl(igUrl)}" target="_blank" rel="noopener noreferrer">${this.escapeHtml(instagramDisplay(c.instagram))}</a>` : ''}</div>
+                        <div class="client-slug muted">/${this.escapeHtml(c.slug || '')}${c.instagram ? ` · <a href="${this.safeUrl(igUrl)}" target="_blank" rel="noopener noreferrer" data-stop>${this.escapeHtml(instagramDisplay(c.instagram))}</a>` : ''}</div>
+                        ${notesExcerpt ? `<div class="card-notes">📝 ${notesExcerpt}</div>` : ''}
                     </div>
                     <div class="client-actions">
                         ${igBtn}
-                        <button class="icon-btn ghost" data-action="orders" title="View orders" aria-label="View orders">📂</button>
-                        <button class="icon-btn ghost" data-action="edit" title="Edit" aria-label="Edit">✏️</button>
+                        <button class="icon-btn ghost" data-action="orders" data-stop title="View orders" aria-label="View orders">📂</button>
                     </div>
                 </div>
             </article>`;
@@ -886,14 +922,18 @@ class AdminDashboard {
             const key = card.dataset.key;
             const c = this.clients.find((x) => x.firebaseKey === key);
             if (!c) return;
-            card.querySelector('[data-action="orders"]').addEventListener('click', () => {
+            const openOrders = (ev) => {
+                ev.stopPropagation();
                 this.orderClientFilter = { id: c.firebaseKey, name: c.name };
                 this.orderStatusTab = 'pending';
                 this.switchView('orders');
                 document.querySelectorAll('#orderSubTabs .sub-tab').forEach((t) => t.classList.toggle('active', t.dataset.status === 'pending'));
                 this.renderOrders();
-            });
-            card.querySelector('[data-action="edit"]').addEventListener('click', () => this.openClientSheet(c));
+            };
+            card.querySelector('[data-action="orders"]').addEventListener('click', openOrders);
+            card.querySelectorAll('[data-stop]').forEach((el) => el.addEventListener('click', (e) => e.stopPropagation()));
+            card.addEventListener('click', () => this.openClientDetail(c.firebaseKey));
+            card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.openClientDetail(c.firebaseKey); } });
         });
     }
 
@@ -1667,8 +1707,9 @@ class AdminDashboard {
             const ch = this.channelName(l.channel);
             const igUrl = l.instagram ? this.normalizeInstagram(l.instagram) : '';
             const igLabel = l.instagram ? this.instagramDisplay(l.instagram) : '';
+            const notesExcerpt = l.notes ? this.escapeHtml(this.truncate(l.notes, 90)) : '';
             return `
-            <article class="client-card legacy-card" data-key="${key}">
+            <article class="client-card legacy-card clickable-card" data-key="${key}" role="button" tabindex="0">
                 <div class="client-row">
                     <div class="client-primary">
                         <div class="client-name">${l.hot ? '🔥 ' : ''}${this.escapeHtml(l.name || 'No name')}</div>
@@ -1676,12 +1717,12 @@ class AdminDashboard {
                             ${ch ? `<span class="chip">📡 ${this.escapeHtml(ch)}</span>` : ''}
                             <span class="${d > 60 ? 'overdue' : ''}">last contact: ${this.escapeHtml(ago)}</span>
                         </div>
-                        ${igUrl ? `<div class="client-slug muted"><a href="${igUrl}" target="_blank" rel="noopener noreferrer">${this.escapeHtml(igLabel)}</a></div>` : ''}
+                        ${igUrl ? `<div class="client-slug muted"><a href="${igUrl}" target="_blank" rel="noopener noreferrer" data-stop>${this.escapeHtml(igLabel)}</a></div>` : ''}
+                        ${notesExcerpt ? `<div class="card-notes">📝 ${notesExcerpt}</div>` : ''}
                     </div>
                     <div class="client-actions">
-                        <button class="icon-btn ghost" data-action="hot" title="${l.hot ? 'Unmark hot' : 'Mark hot'}" aria-label="Toggle hot">${l.hot ? '🔥' : '☆'}</button>
-                        <button class="icon-btn ghost" data-action="touch" title="Mark contacted today" aria-label="Mark contacted">📅</button>
-                        <button class="icon-btn ghost" data-action="edit" title="Edit" aria-label="Edit">✏️</button>
+                        <button class="icon-btn ghost" data-action="hot" data-stop title="${l.hot ? 'Unmark hot' : 'Mark hot'}" aria-label="Toggle hot">${l.hot ? '🔥' : '☆'}</button>
+                        <button class="icon-btn ghost" data-action="touch" data-stop title="Mark contacted today" aria-label="Mark contacted">📅</button>
                     </div>
                 </div>
             </article>`;
@@ -1690,7 +1731,7 @@ class AdminDashboard {
         list.querySelectorAll('.legacy-card').forEach((card) => {
             const l = this.legacyClients.find((x) => x.firebaseKey === card.dataset.key);
             if (!l) return;
-            card.querySelector('[data-action="edit"]').addEventListener('click', () => this.openLegacySheet(l));
+            card.querySelectorAll('[data-stop]').forEach((el) => el.addEventListener('click', (e) => e.stopPropagation()));
             card.querySelector('[data-action="hot"]').addEventListener('click', async () => {
                 try {
                     await update(ref(database, `legacyClients/${l.firebaseKey}`), { hot: !l.hot, updatedAt: Date.now() });
@@ -1702,6 +1743,8 @@ class AdminDashboard {
                     this.toast('Marked contacted today', 'success');
                 } catch (err) { console.error(err); this.toast('Update failed', 'error'); }
             });
+            card.addEventListener('click', () => this.openLegacyDetail(l.firebaseKey));
+            card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.openLegacyDetail(l.firebaseKey); } });
         });
     }
 
@@ -1821,6 +1864,315 @@ class AdminDashboard {
             } catch (e) { return v; }
         }
         return v.startsWith('@') ? v : `@${v}`;
+    }
+
+    truncate(text, max) {
+        const s = String(text || '');
+        if (s.length <= max) return s;
+        return s.slice(0, max).trim() + '…';
+    }
+
+    /* ============== CLIENT DETAIL ============== */
+
+    openClientDetail(firebaseKey) {
+        this.clientDetailId = firebaseKey;
+        this.clientDetailDirty = false;
+        this.switchView('client-detail');
+        this.renderClientDetail();
+    }
+
+    renderClientDetail() {
+        const c = this.clients.find((x) => x.firebaseKey === this.clientDetailId);
+        if (!c) {
+            this.switchView('clients');
+            return;
+        }
+        const stats = this.clientStats(c);
+        const igUrl = this.normalizeInstagram(c.instagram || '');
+        document.getElementById('clientDetailTitle').textContent = c.name || 'Client';
+
+        const channelOpts = ['<option value="">No channel</option>'].concat(
+            this.channels.map((ch) =>
+                `<option value="${this.escapeAttribute(ch.firebaseKey)}" ${ch.firebaseKey === c.channel ? 'selected' : ''}>${this.escapeHtml(ch.name)}</option>`
+            )
+        ).join('');
+
+        const orderItems = this.orders
+            .filter((o) => o.clientId === c.firebaseKey && !this.isTestOrder(o))
+            .sort((a, b) => this.orderTimestampMs(b) - this.orderTimestampMs(a));
+
+        document.getElementById('clientDetailBody').innerHTML = `
+            <div class="detail-stats">
+                <div class="stat-pill"><span class="stat-pill-label">Orders</span><span class="stat-pill-value">${stats.orderCount}</span></div>
+                <div class="stat-pill"><span class="stat-pill-label">Spent</span><span class="stat-pill-value">$${stats.totalSpent.toFixed(2)}</span></div>
+                <div class="stat-pill"><span class="stat-pill-label">Views gained</span><span class="stat-pill-value">+${stats.viewsGained.toLocaleString()}</span></div>
+                <div class="stat-pill"><span class="stat-pill-label">Last order</span><span class="stat-pill-value">${stats.lastOrderTs ? this.formatRelative(stats.lastOrderTs) : '—'}</span></div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-row">
+                    <label for="dcName">Name</label>
+                    <input type="text" id="dcName" value="${this.escapeAttribute(c.name || '')}">
+                </div>
+                <div class="form-row">
+                    <label for="dcSlug">Public slug</label>
+                    <input type="text" id="dcSlug" value="${this.escapeAttribute(c.slug || '')}">
+                    <small class="muted">Public URL: <code>campaigns.upscalemarketingsolutions.com/c/<span id="dcSlugPreview">${this.escapeHtml(c.slug || 'slug')}</span></code> ${c.slug ? `· <a href="https://campaigns.upscalemarketingsolutions.com/c/${encodeURIComponent(c.slug)}" target="_blank" rel="noopener noreferrer">open</a>` : ''}</small>
+                </div>
+                <div class="form-row">
+                    <label for="dcInstagram">Instagram</label>
+                    <input type="text" id="dcInstagram" value="${this.escapeAttribute(c.instagram || '')}" placeholder="@username or full URL">
+                    ${igUrl ? `<small class="muted"><a href="${igUrl}" target="_blank" rel="noopener noreferrer">${this.escapeHtml(this.instagramDisplay(c.instagram))}</a></small>` : ''}
+                </div>
+                <div class="form-row">
+                    <label for="dcChannel">Channel</label>
+                    <select id="dcChannel">${channelOpts}</select>
+                </div>
+                <div class="form-row">
+                    <label for="dcNotes">Notes</label>
+                    <textarea id="dcNotes" rows="6">${this.escapeHtml(c.notes || '')}</textarea>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <h3>Orders (${orderItems.length})</h3>
+                <div class="detail-orders" id="detailOrdersList"></div>
+            </div>
+        `;
+
+        const ordersList = document.getElementById('detailOrdersList');
+        if (orderItems.length === 0) {
+            ordersList.innerHTML = `<div class="empty-inline">No orders assigned yet.</div>`;
+        } else {
+            ordersList.innerHTML = orderItems.map((o) => {
+                const time = this.formatRelative(this.orderTimestampMs(o));
+                const status = this.formatStatus(o.serviceStatus || 'pending');
+                const amt = Number(o.amount || 0).toFixed(2);
+                return `
+                <div class="detail-order-row" data-key="${this.escapeAttribute(o.firebaseKey)}">
+                    <div class="detail-order-main">
+                        <div class="detail-order-amount">$${amt}</div>
+                        <div class="detail-order-meta muted">${this.escapeHtml(status)} · ${this.escapeHtml(time)}</div>
+                    </div>
+                    <button class="icon-btn ghost" data-edit-order title="Edit">✏️</button>
+                </div>`;
+            }).join('');
+            ordersList.querySelectorAll('.detail-order-row').forEach((row) => {
+                row.querySelector('[data-edit-order]').addEventListener('click', () => this.openOrderEditSheet(row.dataset.key));
+            });
+        }
+
+        // Dirty tracking
+        ['dcName', 'dcSlug', 'dcInstagram', 'dcChannel', 'dcNotes'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', () => { this.clientDetailDirty = true; });
+            if (el && el.tagName === 'SELECT') el.addEventListener('change', () => { this.clientDetailDirty = true; });
+        });
+        // Live slug preview
+        document.getElementById('dcSlug').addEventListener('input', (e) => {
+            const v = this.toSlug(e.target.value);
+            e.target.value = v;
+            document.getElementById('dcSlugPreview').textContent = v || 'slug';
+        });
+        document.getElementById('dcName').addEventListener('input', (e) => {
+            // Only auto-generate slug if it was empty originally
+            if (!c.slug) {
+                const v = this.toSlug(e.target.value);
+                document.getElementById('dcSlug').value = v;
+                document.getElementById('dcSlugPreview').textContent = v || 'slug';
+            }
+        });
+    }
+
+    async saveClientDetail() {
+        const c = this.clients.find((x) => x.firebaseKey === this.clientDetailId);
+        if (!c) return;
+
+        const newName = document.getElementById('dcName').value.trim();
+        if (!newName) return this.toast('Name required', 'error');
+        let newSlug = this.toSlug(document.getElementById('dcSlug').value || newName);
+        if (!newSlug) return this.toast('Slug required', 'error');
+
+        // Uniqueness
+        const collision = this.clients.find((x) => x.slug === newSlug && x.firebaseKey !== c.firebaseKey);
+        if (collision) newSlug = await this.uniqueSlug(newSlug, c.firebaseKey);
+
+        const payload = {
+            name: newName,
+            slug: newSlug,
+            instagram: document.getElementById('dcInstagram').value.trim() || null,
+            channel: document.getElementById('dcChannel').value || null,
+            notes: document.getElementById('dcNotes').value,
+            updatedAt: Date.now(),
+        };
+
+        try {
+            await update(ref(database, `usmClients/${c.firebaseKey}`), payload);
+            // Propagate denormalized clientName/Slug on orders
+            if (newName !== c.name || newSlug !== c.slug) {
+                const updates = {};
+                this.orders.forEach((o) => {
+                    if (o.clientId === c.firebaseKey) {
+                        updates[`orders/${o.firebaseKey}/clientName`] = newName;
+                        updates[`orders/${o.firebaseKey}/clientSlug`] = newSlug;
+                    }
+                });
+                if (Object.keys(updates).length) await update(ref(database), updates);
+            }
+            this.clientDetailDirty = false;
+            this.toast('Saved', 'success');
+        } catch (err) { console.error(err); this.toast('Save failed', 'error'); }
+    }
+
+    deleteClientFromDetail() {
+        const c = this.clients.find((x) => x.firebaseKey === this.clientDetailId);
+        if (!c) return;
+        const stats = this.clientStats(c);
+        const note = stats.orderCount
+            ? `<p>This client has <strong>${stats.orderCount}</strong> assigned order${stats.orderCount === 1 ? '' : 's'}. They will be unassigned (not deleted).</p>`
+            : '';
+        this.openConfirm('Delete client?',
+            `<p>Remove <strong>${this.escapeHtml(c.name)}</strong>?</p>${note}`,
+            async () => {
+                try {
+                    const updates = {};
+                    this.orders.forEach((o) => {
+                        if (o.clientId === c.firebaseKey) {
+                            updates[`orders/${o.firebaseKey}/clientId`] = null;
+                            updates[`orders/${o.firebaseKey}/clientName`] = null;
+                            updates[`orders/${o.firebaseKey}/clientSlug`] = null;
+                        }
+                    });
+                    updates[`usmClients/${c.firebaseKey}`] = null;
+                    await update(ref(database), updates);
+                    this.toast('Deleted', 'success');
+                    this.closeConfirm();
+                    this.clientDetailId = null;
+                    this.clientDetailDirty = false;
+                    this.switchView('clients');
+                } catch (err) { console.error(err); this.toast('Delete failed', 'error'); }
+            });
+    }
+
+    /* ============== LEGACY DETAIL ============== */
+
+    openLegacyDetail(firebaseKey) {
+        this.legacyDetailId = firebaseKey;
+        this.legacyDetailDirty = false;
+        this.switchView('legacy-detail');
+        this.renderLegacyDetail();
+    }
+
+    renderLegacyDetail() {
+        const l = this.legacyClients.find((x) => x.firebaseKey === this.legacyDetailId);
+        if (!l) {
+            this.switchView('legacy-clients');
+            return;
+        }
+        document.getElementById('legacyDetailTitle').textContent = l.name || 'Old client';
+
+        const channelOpts = ['<option value="">No channel</option>'].concat(
+            this.channels.map((ch) =>
+                `<option value="${this.escapeAttribute(ch.firebaseKey)}" ${ch.firebaseKey === l.channel ? 'selected' : ''}>${this.escapeHtml(ch.name)}</option>`
+            )
+        ).join('');
+
+        const d = daysSince(l.lastContacted);
+        const ago = !l.lastContacted ? 'never contacted' :
+                   d === 0 ? 'today' :
+                   d === 1 ? 'yesterday' :
+                   d < 7 ? `${d} days ago` :
+                   d < 30 ? `${Math.floor(d/7)} weeks ago` :
+                   d < 365 ? `${Math.floor(d/30)} months ago` : `${Math.floor(d/365)} years ago`;
+        const lastDate = dateInputFromMs(l.lastContacted) || todayDateInput();
+        const igUrl = this.normalizeInstagram(l.instagram || '');
+
+        document.getElementById('legacyDetailBody').innerHTML = `
+            <div class="detail-stats">
+                <div class="stat-pill"><span class="stat-pill-label">Last contact</span><span class="stat-pill-value ${d > 60 ? 'overdue' : ''}">${this.escapeHtml(ago)}</span></div>
+                <div class="stat-pill"><span class="stat-pill-label">Status</span><span class="stat-pill-value">${l.hot ? '🔥 Hot' : 'Normal'}</span></div>
+                <div class="stat-pill"><span class="stat-pill-label">Channel</span><span class="stat-pill-value">${this.escapeHtml(this.channelName(l.channel) || '—')}</span></div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-row">
+                    <label for="dlName">Name</label>
+                    <input type="text" id="dlName" value="${this.escapeAttribute(l.name || '')}">
+                </div>
+                <div class="form-row">
+                    <label for="dlIg">Instagram</label>
+                    <input type="text" id="dlIg" value="${this.escapeAttribute(l.instagram || '')}" placeholder="@username or full URL">
+                    ${igUrl ? `<small class="muted"><a href="${igUrl}" target="_blank" rel="noopener noreferrer">${this.escapeHtml(this.instagramDisplay(l.instagram))}</a></small>` : ''}
+                </div>
+                <div class="form-row">
+                    <label for="dlChannel">Channel</label>
+                    <select id="dlChannel">${channelOpts}</select>
+                </div>
+                <div class="form-row">
+                    <label for="dlDate">Last contacted</label>
+                    <div class="date-row">
+                        <input type="date" id="dlDate" value="${lastDate}">
+                        <button type="button" class="ghost-btn" id="dlDateToday">Today</button>
+                    </div>
+                </div>
+                <div class="form-row checkbox-row">
+                    <label class="checkbox"><input type="checkbox" id="dlHot" ${l.hot ? 'checked' : ''}> 🔥 Mark as hot</label>
+                </div>
+                <div class="form-row">
+                    <label for="dlNotes">Notes</label>
+                    <textarea id="dlNotes" rows="6">${this.escapeHtml(l.notes || '')}</textarea>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('dlDateToday').addEventListener('click', () => {
+            document.getElementById('dlDate').value = todayDateInput();
+            this.legacyDetailDirty = true;
+        });
+        ['dlName', 'dlIg', 'dlChannel', 'dlDate', 'dlHot', 'dlNotes'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('input', () => { this.legacyDetailDirty = true; });
+            el.addEventListener('change', () => { this.legacyDetailDirty = true; });
+        });
+    }
+
+    async saveLegacyDetail() {
+        const l = this.legacyClients.find((x) => x.firebaseKey === this.legacyDetailId);
+        if (!l) return;
+        const name = document.getElementById('dlName').value.trim();
+        if (!name) return this.toast('Name required', 'error');
+        const payload = {
+            name,
+            instagram: document.getElementById('dlIg').value.trim() || null,
+            channel: document.getElementById('dlChannel').value || null,
+            lastContacted: msFromDateInput(document.getElementById('dlDate').value) || Date.now(),
+            hot: document.getElementById('dlHot').checked,
+            notes: document.getElementById('dlNotes').value,
+            updatedAt: Date.now(),
+        };
+        try {
+            await update(ref(database, `legacyClients/${l.firebaseKey}`), payload);
+            this.legacyDetailDirty = false;
+            this.toast('Saved', 'success');
+        } catch (err) { console.error(err); this.toast('Save failed', 'error'); }
+    }
+
+    deleteLegacyFromDetail() {
+        const l = this.legacyClients.find((x) => x.firebaseKey === this.legacyDetailId);
+        if (!l) return;
+        this.openConfirm('Delete old client?',
+            `<p>Remove <strong>${this.escapeHtml(l.name || 'this entry')}</strong>?</p>`,
+            async () => {
+                try {
+                    await remove(ref(database, `legacyClients/${l.firebaseKey}`));
+                    this.toast('Deleted', 'success');
+                    this.closeConfirm();
+                    this.legacyDetailId = null;
+                    this.legacyDetailDirty = false;
+                    this.switchView('legacy-clients');
+                } catch (err) { console.error(err); this.toast('Delete failed', 'error'); }
+            });
     }
 }
 
