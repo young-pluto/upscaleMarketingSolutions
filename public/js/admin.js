@@ -18,6 +18,51 @@ const TEST_ORDER_CUTOFF_MS = Date.parse('2025-09-06T00:00:00Z');
 const ORDER_STATUSES = ['pending', 'in_progress', 'completed', 'cancelled'];
 const TRIAL_STATUSES = ['new', 'completed', 'contacted', 'archived'];
 
+const DAY_MS = 86_400_000;
+const LEGACY_BUCKETS = [
+    { key: 'this_week', label: 'This week', min: 0, max: 7 },
+    { key: '7_15', label: '7-15 days', min: 7, max: 15 },
+    { key: '15_30', label: '15-30 days', min: 15, max: 30 },
+    { key: '1_2m', label: '1-2 months', min: 30, max: 60 },
+    { key: '2_6m', label: '2-6 months', min: 60, max: 180 },
+];
+
+function daysSince(ms) {
+    if (!ms) return Infinity;
+    return Math.max(0, Math.floor((Date.now() - ms) / DAY_MS));
+}
+
+function bucketForDays(d) {
+    for (const b of LEGACY_BUCKETS) {
+        if (d >= b.min && d < b.max) return b.key;
+    }
+    return null;
+}
+
+function todayDateInput() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function msFromDateInput(value) {
+    if (!value) return null;
+    const ts = Date.parse(`${value}T12:00:00`);
+    return Number.isNaN(ts) ? null : ts;
+}
+
+function dateInputFromMs(ms) {
+    if (!ms) return '';
+    const d = new Date(ms);
+    if (Number.isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
 function normalizeTrialStatus(s) {
     // Back-compat: legacy 'qualified' is treated as 'completed'.
     const v = String(s || 'new');
@@ -55,8 +100,14 @@ class AdminDashboard {
         this.orders = [];
         this.clients = [];
         this.trialCampaigns = [];
+        this.legacyClients = [];
+        this.channels = [];
 
         this.unsubscribers = [];
+
+        // Legacy clients UI state
+        this.legacyBucket = 'hot';
+        this.legacyChannel = '';
 
         // Orders UI state
         this.orderStatusTab = 'pending';
@@ -134,9 +185,34 @@ class AdminDashboard {
         document.getElementById('loginForm').addEventListener('submit', (e) => { e.preventDefault(); this.handleLogin(); });
         document.getElementById('logoutBtn').addEventListener('click', () => this.handleLogout());
 
-        document.querySelectorAll('.app-tab').forEach((btn) => {
-            btn.addEventListener('click', () => this.switchView(btn.dataset.view));
+        // Sidebar navigation (replaces .app-tab)
+        document.querySelectorAll('.side-link').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                this.switchView(btn.dataset.view);
+                this.closeSidebar();
+            });
         });
+        document.getElementById('menuToggle').addEventListener('click', () => this.toggleSidebar());
+        document.getElementById('sidebarBackdrop').addEventListener('click', () => this.closeSidebar());
+
+        // Legacy clients
+        document.getElementById('legacySearchInput').addEventListener('input', () => this.renderLegacy());
+        document.getElementById('legacySortBy').addEventListener('change', () => this.renderLegacy());
+        document.getElementById('legacyChannelFilter').addEventListener('change', (e) => { this.legacyChannel = e.target.value; this.renderLegacy(); });
+        document.getElementById('addLegacyBtn').addEventListener('click', () => this.openLegacySheet(null));
+        document.getElementById('refreshLegacyBtn').addEventListener('click', () => this.renderLegacy());
+        document.querySelectorAll('#legacySubTabs .sub-tab').forEach((tab) => {
+            tab.addEventListener('click', () => {
+                this.legacyBucket = tab.dataset.bucket;
+                document.querySelectorAll('#legacySubTabs .sub-tab').forEach((t) => t.classList.toggle('active', t === tab));
+                this.renderLegacy();
+            });
+        });
+
+        // Channels
+        document.getElementById('channelSearchInput').addEventListener('input', () => this.renderChannels());
+        document.getElementById('addChannelBtn').addEventListener('click', () => this.openChannelSheet(null));
+        document.getElementById('refreshChannelsBtn').addEventListener('click', () => this.renderChannels());
 
         // Orders
         document.getElementById('searchInput').addEventListener('input', () => this.renderOrders());
@@ -210,10 +286,40 @@ class AdminDashboard {
 
     switchView(view) {
         this.activeView = view;
-        document.querySelectorAll('.app-tab').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
-        document.getElementById('ordersView').classList.toggle('active', view === 'orders');
-        document.getElementById('clientsView').classList.toggle('active', view === 'clients');
-        document.getElementById('trialCampaignsView').classList.toggle('active', view === 'trial-campaigns');
+        document.querySelectorAll('.side-link').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+        const panels = {
+            'orders': 'ordersView',
+            'clients': 'clientsView',
+            'legacy-clients': 'legacyClientsView',
+            'trial-campaigns': 'trialCampaignsView',
+            'channels': 'channelsView',
+        };
+        Object.entries(panels).forEach(([v, id]) => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('active', v === view);
+        });
+        const labelMap = {
+            'orders': 'Orders',
+            'clients': 'Clients',
+            'legacy-clients': 'Old Clients',
+            'trial-campaigns': 'Trial Leads',
+            'channels': 'Channels',
+        };
+        const lbl = document.getElementById('activeViewLabel');
+        if (lbl) lbl.textContent = labelMap[view] || '';
+    }
+
+    toggleSidebar() {
+        const sb = document.getElementById('appSidebar');
+        const bd = document.getElementById('sidebarBackdrop');
+        const open = !sb.classList.contains('open');
+        sb.classList.toggle('open', open);
+        bd.classList.toggle('open', open);
+    }
+
+    closeSidebar() {
+        document.getElementById('appSidebar').classList.remove('open');
+        document.getElementById('sidebarBackdrop').classList.remove('open');
     }
 
     /* ============== DATA SUBSCRIPTIONS ============== */
@@ -246,6 +352,26 @@ class AdminDashboard {
             console.warn('Realtime clients read failed', err);
         });
         this.unsubscribers.push(offClients);
+
+        const legacyRef = ref(database, 'legacyClients');
+        const offLegacy = onValue(legacyRef, (snap) => {
+            const val = snap.val() || {};
+            this.legacyClients = Object.entries(val).map(([key, data]) => ({ ...data, firebaseKey: key }));
+            this.renderLegacy();
+        }, (err) => console.warn('Realtime legacyClients read failed', err));
+        this.unsubscribers.push(offLegacy);
+
+        const channelsRef = ref(database, 'channels');
+        const offChannels = onValue(channelsRef, (snap) => {
+            const val = snap.val() || {};
+            this.channels = Object.entries(val).map(([key, data]) => ({ ...data, firebaseKey: key }));
+            this.channels.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+            this.renderChannels();
+            this.refreshChannelFilters();
+            this.renderLegacy();
+            this.renderClients();
+        }, (err) => console.warn('Realtime channels read failed', err));
+        this.unsubscribers.push(offChannels);
 
         const trialRef = ref(database, 'trialCampaignSubmissions');
         const offTrial = onValue(trialRef, (snap) => {
@@ -743,6 +869,7 @@ class AdminDashboard {
                             <span>+${c._stats.viewsGained.toLocaleString()} views</span>
                             <span class="dot">·</span>
                             <span class="muted">${this.escapeHtml(recent)}</span>
+                            ${c.channel ? `<span class="chip">📡 ${this.escapeHtml(this.channelName(c.channel))}</span>` : ''}
                         </div>
                         <div class="client-slug muted">/${this.escapeHtml(c.slug || '')}${c.instagram ? ` · <a href="${this.safeUrl(igUrl)}" target="_blank" rel="noopener noreferrer">${this.escapeHtml(instagramDisplay(c.instagram))}</a>` : ''}</div>
                     </div>
@@ -776,6 +903,13 @@ class AdminDashboard {
         const slug = client ? (client.slug || '') : '';
         const notes = client ? (client.notes || '') : '';
         const instagram = client ? (client.instagram || '') : '';
+        const channelId = client ? (client.channel || '') : '';
+
+        const channelOpts = ['<option value="">No channel</option>'].concat(
+            this.channels.map((c) =>
+                `<option value="${this.escapeAttribute(c.firebaseKey)}" ${c.firebaseKey === channelId ? 'selected' : ''}>${this.escapeHtml(c.name)}</option>`
+            )
+        ).join('');
 
         const body = `
             <div class="form-grid">
@@ -791,6 +925,10 @@ class AdminDashboard {
                 <div class="form-row">
                     <label for="cInstagram">Instagram link or @handle</label>
                     <input type="text" id="cInstagram" value="${this.escapeAttribute(instagram)}" placeholder="@username or full URL" autocomplete="off">
+                </div>
+                <div class="form-row">
+                    <label for="cChannel">Channel</label>
+                    <select id="cChannel">${channelOpts}</select>
                 </div>
                 <div class="form-row">
                     <label for="cNotes">Notes</label>
@@ -843,6 +981,7 @@ class AdminDashboard {
                         name: newName,
                         slug: newSlug,
                         instagram: document.getElementById('cInstagram').value.trim() || null,
+                        channel: document.getElementById('cChannel').value || null,
                         notes: document.getElementById('cNotes').value,
                         updatedAt: Date.now()
                     });
@@ -866,6 +1005,7 @@ class AdminDashboard {
                         name: newName,
                         slug: newSlug,
                         instagram: document.getElementById('cInstagram').value.trim() || null,
+                        channel: document.getElementById('cChannel').value || null,
                         notes: document.getElementById('cNotes').value,
                         createdAt: Date.now(),
                         updatedAt: Date.now()
@@ -1315,6 +1455,372 @@ class AdminDashboard {
 
     escapeAttribute(v) {
         return this.escapeHtml(v).replace(/`/g, '&#96;');
+    }
+
+    /* ============== CHANNELS ============== */
+
+    refreshChannelFilters() {
+        const sel = document.getElementById('legacyChannelFilter');
+        if (!sel) return;
+        const current = sel.value;
+        const opts = ['<option value="">All</option>'].concat(this.channels.map((c) =>
+            `<option value="${this.escapeAttribute(c.firebaseKey)}">${this.escapeHtml(c.name)}</option>`
+        ));
+        sel.innerHTML = opts.join('');
+        if (this.channels.some((c) => c.firebaseKey === current)) sel.value = current;
+    }
+
+    channelName(id) {
+        if (!id) return '';
+        const c = this.channels.find((x) => x.firebaseKey === id);
+        return c ? c.name : '';
+    }
+
+    renderChannels() {
+        const list = document.getElementById('channelsList');
+        const empty = document.getElementById('noChannelsMessage');
+        const counter = document.getElementById('channelCounter');
+        if (!list) return;
+        const search = (document.getElementById('channelSearchInput')?.value || '').toLowerCase().trim();
+
+        let items = this.channels.slice();
+        if (search) items = items.filter((c) => String(c.name || '').toLowerCase().includes(search));
+
+        counter.textContent = `${items.length}`;
+        if (items.length === 0) {
+            list.innerHTML = '';
+            empty.style.display = 'block';
+            return;
+        }
+        empty.style.display = 'none';
+
+        list.innerHTML = items.map((c) => {
+            const key = this.escapeAttribute(c.firebaseKey);
+            const legacyCount = this.legacyClients.filter((l) => l.channel === c.firebaseKey).length;
+            const clientCount = this.clients.filter((x) => x.channel === c.firebaseKey).length;
+            return `
+            <article class="client-card" data-key="${key}">
+                <div class="client-row">
+                    <div class="client-primary">
+                        <div class="client-name">📡 ${this.escapeHtml(c.name)}</div>
+                        <div class="client-meta">
+                            <span>${clientCount} client${clientCount === 1 ? '' : 's'}</span>
+                            <span class="dot">·</span>
+                            <span>${legacyCount} legacy</span>
+                        </div>
+                    </div>
+                    <div class="client-actions">
+                        <button class="icon-btn ghost" data-action="edit" title="Edit" aria-label="Edit">✏️</button>
+                    </div>
+                </div>
+            </article>`;
+        }).join('');
+
+        list.querySelectorAll('.client-card').forEach((card) => {
+            const c = this.channels.find((x) => x.firebaseKey === card.dataset.key);
+            if (!c) return;
+            card.querySelector('[data-action="edit"]').addEventListener('click', () => this.openChannelSheet(c));
+        });
+    }
+
+    openChannelSheet(channel) {
+        const isEdit = !!channel;
+        const name = channel ? channel.name : '';
+        const body = `
+            <div class="form-grid">
+                <div class="form-row">
+                    <label for="chName">Channel name</label>
+                    <input type="text" id="chName" value="${this.escapeAttribute(name)}" placeholder="e.g. rapamplified">
+                </div>
+            </div>
+        `;
+        const footer = isEdit
+            ? `<button class="danger-btn" id="deleteChannelBtn">🗑 Delete</button>
+               <div class="footer-spacer"></div>
+               <button class="ghost-btn" data-sheet-close>Cancel</button>
+               <button class="primary-btn" id="saveChannelBtn">Save</button>`
+            : `<div class="footer-spacer"></div>
+               <button class="ghost-btn" data-sheet-close>Cancel</button>
+               <button class="primary-btn" id="saveChannelBtn">Add</button>`;
+        this.openSheet(isEdit ? 'Edit channel' : 'New channel', body, footer);
+
+        document.getElementById('saveChannelBtn').addEventListener('click', async () => {
+            const v = document.getElementById('chName').value.trim();
+            if (!v) return this.toast('Name required', 'error');
+            try {
+                if (isEdit) {
+                    await update(ref(database, `channels/${channel.firebaseKey}`), { name: v, updatedAt: Date.now() });
+                } else {
+                    const r = push(ref(database, 'channels'));
+                    await set(r, { name: v, createdAt: Date.now() });
+                }
+                this.toast('Channel saved', 'success');
+                this.closeSheet();
+            } catch (err) { console.error(err); this.toast('Save failed', 'error'); }
+        });
+
+        if (isEdit) {
+            document.getElementById('deleteChannelBtn').addEventListener('click', () => {
+                const linked = this.legacyClients.filter((l) => l.channel === channel.firebaseKey).length
+                             + this.clients.filter((x) => x.channel === channel.firebaseKey).length;
+                const note = linked
+                    ? `<p>${linked} record${linked === 1 ? '' : 's'} reference this channel. They will be unlinked, not deleted.</p>`
+                    : '';
+                this.openConfirm('Delete channel?',
+                    `<p>Remove <strong>${this.escapeHtml(channel.name)}</strong>?</p>${note}`,
+                    async () => {
+                        try {
+                            const updates = {};
+                            this.legacyClients.forEach((l) => {
+                                if (l.channel === channel.firebaseKey) updates[`legacyClients/${l.firebaseKey}/channel`] = null;
+                            });
+                            this.clients.forEach((c) => {
+                                if (c.channel === channel.firebaseKey) updates[`usmClients/${c.firebaseKey}/channel`] = null;
+                            });
+                            updates[`channels/${channel.firebaseKey}`] = null;
+                            await update(ref(database), updates);
+                            this.toast('Channel deleted', 'success');
+                            this.closeConfirm();
+                            this.closeSheet();
+                        } catch (err) { console.error(err); this.toast('Delete failed', 'error'); }
+                    });
+            });
+        }
+    }
+
+    /* ============== LEGACY CLIENTS ============== */
+
+    legacyCounts() {
+        const counts = { hot: 0, this_week: 0, '7_15': 0, '15_30': 0, '1_2m': 0, '2_6m': 0, all: this.legacyClients.length };
+        this.legacyClients.forEach((l) => {
+            if (l.hot) counts.hot++;
+            const d = daysSince(l.lastContacted);
+            const b = bucketForDays(d);
+            if (b) counts[b]++;
+        });
+        return counts;
+    }
+
+    renderLegacy() {
+        const list = document.getElementById('legacyList');
+        const empty = document.getElementById('noLegacyMessage');
+        const counter = document.getElementById('legacyCounter');
+        if (!list) return;
+
+        const counts = this.legacyCounts();
+        const setCount = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n; };
+        setCount('countHot', counts.hot);
+        setCount('countWeek', counts.this_week);
+        setCount('count715', counts['7_15']);
+        setCount('count1530', counts['15_30']);
+        setCount('count12m', counts['1_2m']);
+        setCount('count26m', counts['2_6m']);
+        setCount('countAllLegacy', counts.all);
+
+        const search = (document.getElementById('legacySearchInput')?.value || '').toLowerCase().trim();
+        const sortBy = document.getElementById('legacySortBy').value;
+
+        let items = this.legacyClients.slice();
+
+        if (this.legacyBucket === 'hot') {
+            items = items.filter((l) => !!l.hot);
+        } else if (this.legacyBucket !== 'all') {
+            items = items.filter((l) => bucketForDays(daysSince(l.lastContacted)) === this.legacyBucket);
+        }
+
+        if (this.legacyChannel) items = items.filter((l) => l.channel === this.legacyChannel);
+
+        if (search) {
+            items = items.filter((l) =>
+                String(l.name || '').toLowerCase().includes(search) ||
+                String(l.instagram || '').toLowerCase().includes(search) ||
+                this.channelName(l.channel).toLowerCase().includes(search)
+            );
+        }
+
+        items.sort((a, b) => {
+            switch (sortBy) {
+                case 'newest': return (b.lastContacted || 0) - (a.lastContacted || 0);
+                case 'name_asc': return String(a.name || '').localeCompare(String(b.name || ''));
+                case 'oldest':
+                default: return (a.lastContacted || 0) - (b.lastContacted || 0);
+            }
+        });
+
+        counter.textContent = `${items.length}`;
+        if (items.length === 0) {
+            list.innerHTML = '';
+            empty.style.display = 'block';
+            return;
+        }
+        empty.style.display = 'none';
+
+        list.innerHTML = items.map((l) => {
+            const key = this.escapeAttribute(l.firebaseKey);
+            const d = daysSince(l.lastContacted);
+            const ago = !l.lastContacted ? 'never contacted' :
+                       d === 0 ? 'today' :
+                       d === 1 ? 'yesterday' :
+                       d < 7 ? `${d}d ago` :
+                       d < 30 ? `${Math.floor(d/7)}w ago` :
+                       d < 365 ? `${Math.floor(d/30)}mo ago` : `${Math.floor(d/365)}y ago`;
+            const ch = this.channelName(l.channel);
+            const igUrl = l.instagram ? this.normalizeInstagram(l.instagram) : '';
+            const igLabel = l.instagram ? this.instagramDisplay(l.instagram) : '';
+            return `
+            <article class="client-card legacy-card" data-key="${key}">
+                <div class="client-row">
+                    <div class="client-primary">
+                        <div class="client-name">${l.hot ? '🔥 ' : ''}${this.escapeHtml(l.name || 'No name')}</div>
+                        <div class="client-meta">
+                            ${ch ? `<span class="chip">📡 ${this.escapeHtml(ch)}</span>` : ''}
+                            <span class="${d > 60 ? 'overdue' : ''}">last contact: ${this.escapeHtml(ago)}</span>
+                        </div>
+                        ${igUrl ? `<div class="client-slug muted"><a href="${igUrl}" target="_blank" rel="noopener noreferrer">${this.escapeHtml(igLabel)}</a></div>` : ''}
+                    </div>
+                    <div class="client-actions">
+                        <button class="icon-btn ghost" data-action="hot" title="${l.hot ? 'Unmark hot' : 'Mark hot'}" aria-label="Toggle hot">${l.hot ? '🔥' : '☆'}</button>
+                        <button class="icon-btn ghost" data-action="touch" title="Mark contacted today" aria-label="Mark contacted">📅</button>
+                        <button class="icon-btn ghost" data-action="edit" title="Edit" aria-label="Edit">✏️</button>
+                    </div>
+                </div>
+            </article>`;
+        }).join('');
+
+        list.querySelectorAll('.legacy-card').forEach((card) => {
+            const l = this.legacyClients.find((x) => x.firebaseKey === card.dataset.key);
+            if (!l) return;
+            card.querySelector('[data-action="edit"]').addEventListener('click', () => this.openLegacySheet(l));
+            card.querySelector('[data-action="hot"]').addEventListener('click', async () => {
+                try {
+                    await update(ref(database, `legacyClients/${l.firebaseKey}`), { hot: !l.hot, updatedAt: Date.now() });
+                } catch (err) { console.error(err); this.toast('Update failed', 'error'); }
+            });
+            card.querySelector('[data-action="touch"]').addEventListener('click', async () => {
+                try {
+                    await update(ref(database, `legacyClients/${l.firebaseKey}`), { lastContacted: Date.now(), updatedAt: Date.now() });
+                    this.toast('Marked contacted today', 'success');
+                } catch (err) { console.error(err); this.toast('Update failed', 'error'); }
+            });
+        });
+    }
+
+    openLegacySheet(legacy) {
+        const isEdit = !!legacy;
+        const name = legacy ? (legacy.name || '') : '';
+        const instagram = legacy ? (legacy.instagram || '') : '';
+        const channelId = legacy ? (legacy.channel || '') : '';
+        const hot = legacy ? !!legacy.hot : false;
+        const lastContactedDate = legacy && legacy.lastContacted ? dateInputFromMs(legacy.lastContacted) : todayDateInput();
+        const notes = legacy ? (legacy.notes || '') : '';
+
+        const channelOpts = ['<option value="">No channel</option>'].concat(
+            this.channels.map((c) =>
+                `<option value="${this.escapeAttribute(c.firebaseKey)}" ${c.firebaseKey === channelId ? 'selected' : ''}>${this.escapeHtml(c.name)}</option>`
+            )
+        ).join('');
+
+        const body = `
+            <div class="form-grid">
+                <div class="form-row">
+                    <label for="lcName">Name</label>
+                    <input type="text" id="lcName" value="${this.escapeAttribute(name)}" placeholder="e.g. Lil Boss">
+                </div>
+                <div class="form-row">
+                    <label for="lcIg">Instagram link or @handle</label>
+                    <input type="text" id="lcIg" value="${this.escapeAttribute(instagram)}" placeholder="@username or full URL" autocomplete="off">
+                </div>
+                <div class="form-row">
+                    <label for="lcChannel">Channel</label>
+                    <select id="lcChannel">${channelOpts}</select>
+                </div>
+                <div class="form-row">
+                    <label for="lcDate">Last contacted</label>
+                    <div class="date-row">
+                        <input type="date" id="lcDate" value="${lastContactedDate}">
+                        <button type="button" class="ghost-btn" id="lcDateToday">Today</button>
+                    </div>
+                </div>
+                <div class="form-row checkbox-row">
+                    <label class="checkbox"><input type="checkbox" id="lcHot" ${hot ? 'checked' : ''}> 🔥 Mark as hot</label>
+                </div>
+                <div class="form-row">
+                    <label for="lcNotes">Notes</label>
+                    <textarea id="lcNotes" rows="3">${this.escapeHtml(notes)}</textarea>
+                </div>
+            </div>
+        `;
+        const footer = isEdit
+            ? `<button class="danger-btn" id="deleteLegacyBtn">🗑 Delete</button>
+               <div class="footer-spacer"></div>
+               <button class="ghost-btn" data-sheet-close>Cancel</button>
+               <button class="primary-btn" id="saveLegacyBtn">Save</button>`
+            : `<div class="footer-spacer"></div>
+               <button class="ghost-btn" data-sheet-close>Cancel</button>
+               <button class="primary-btn" id="saveLegacyBtn">Add</button>`;
+
+        this.openSheet(isEdit ? 'Edit old client' : 'Add old client', body, footer);
+
+        document.getElementById('lcDateToday').addEventListener('click', () => {
+            document.getElementById('lcDate').value = todayDateInput();
+        });
+
+        document.getElementById('saveLegacyBtn').addEventListener('click', async () => {
+            const payload = {
+                name: document.getElementById('lcName').value.trim(),
+                instagram: document.getElementById('lcIg').value.trim() || null,
+                channel: document.getElementById('lcChannel').value || null,
+                lastContacted: msFromDateInput(document.getElementById('lcDate').value) || Date.now(),
+                hot: document.getElementById('lcHot').checked,
+                notes: document.getElementById('lcNotes').value,
+                updatedAt: Date.now(),
+            };
+            if (!payload.name) return this.toast('Name required', 'error');
+            try {
+                if (isEdit) {
+                    await update(ref(database, `legacyClients/${legacy.firebaseKey}`), payload);
+                } else {
+                    const r = push(ref(database, 'legacyClients'));
+                    await set(r, { ...payload, createdAt: Date.now() });
+                }
+                this.toast(isEdit ? 'Old client saved' : 'Old client added', 'success');
+                this.closeSheet();
+            } catch (err) { console.error(err); this.toast('Save failed', 'error'); }
+        });
+
+        if (isEdit) {
+            document.getElementById('deleteLegacyBtn').addEventListener('click', () => {
+                this.openConfirm('Delete old client?', `<p>Remove <strong>${this.escapeHtml(legacy.name || 'this entry')}</strong>?</p>`, async () => {
+                    try {
+                        await remove(ref(database, `legacyClients/${legacy.firebaseKey}`));
+                        this.toast('Deleted', 'success');
+                        this.closeConfirm();
+                        this.closeSheet();
+                    } catch (err) { console.error(err); this.toast('Delete failed', 'error'); }
+                });
+            });
+        }
+    }
+
+    normalizeInstagram(value) {
+        const v = String(value || '').trim();
+        if (!v) return '';
+        if (/^https?:\/\//i.test(v)) return v;
+        const handle = v.replace(/^@/, '').replace(/^instagram\.com\//i, '').replace(/^\/+/, '');
+        return handle ? `https://instagram.com/${handle}` : '';
+    }
+
+    instagramDisplay(value) {
+        const v = String(value || '').trim();
+        if (!v) return '';
+        if (/^https?:\/\//i.test(v)) {
+            try {
+                const u = new URL(v);
+                const path = u.pathname.replace(/^\/+|\/+$/g, '');
+                return path ? `@${path}` : v;
+            } catch (e) { return v; }
+        }
+        return v.startsWith('@') ? v : `@${v}`;
     }
 }
 

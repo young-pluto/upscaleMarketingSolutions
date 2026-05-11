@@ -35,20 +35,44 @@
         <div id="dashboardScreen" class="dashboard-screen" style="display: none;">
             <header class="app-header">
                 <div class="app-header-inner">
+                    <button id="menuToggle" class="icon-btn ghost menu-toggle" aria-label="Open menu">☰</button>
                     <div class="app-brand">USM</div>
+                    <div class="app-header-current" id="activeViewLabel">Orders</div>
                     <div class="app-header-actions">
                         <span id="adminUserInfo" class="user-info"></span>
                         <button id="logoutBtn" class="icon-btn ghost" title="Logout" aria-label="Logout">⎋</button>
                     </div>
                 </div>
-                <nav class="app-tabs" role="tablist">
-                    <button class="app-tab active" data-view="orders" role="tab">Orders</button>
-                    <button class="app-tab" data-view="clients" role="tab">Clients</button>
-                    <button class="app-tab" data-view="trial-campaigns" role="tab">Trial Leads</button>
-                </nav>
             </header>
 
-            <main class="app-main">
+            <div class="app-shell">
+                <aside id="appSidebar" class="app-sidebar" aria-label="Navigation">
+                    <nav class="sidebar-nav" role="tablist">
+                        <button class="side-link active" data-view="orders" role="tab">
+                            <span class="side-link-icon">📦</span>
+                            <span class="side-link-label">Orders</span>
+                        </button>
+                        <button class="side-link" data-view="clients" role="tab">
+                            <span class="side-link-icon">👥</span>
+                            <span class="side-link-label">Clients</span>
+                        </button>
+                        <button class="side-link" data-view="legacy-clients" role="tab">
+                            <span class="side-link-icon">🗂</span>
+                            <span class="side-link-label">Old Clients</span>
+                        </button>
+                        <button class="side-link" data-view="trial-campaigns" role="tab">
+                            <span class="side-link-icon">🎯</span>
+                            <span class="side-link-label">Trial Leads</span>
+                        </button>
+                        <button class="side-link" data-view="channels" role="tab">
+                            <span class="side-link-icon">📡</span>
+                            <span class="side-link-label">Channels</span>
+                        </button>
+                    </nav>
+                </aside>
+                <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+
+                <main class="app-main">
                 <!-- =================== ORDERS =================== -->
                 <section id="ordersView" class="panel active" role="tabpanel">
                     <div class="panel-toolbar">
@@ -213,7 +237,74 @@
                         <p>Nothing matches your current filters.</p>
                     </div>
                 </section>
-            </main>
+
+                <!-- =================== OLD CLIENTS =================== -->
+                <section id="legacyClientsView" class="panel" role="tabpanel">
+                    <div class="panel-toolbar">
+                        <input type="search" id="legacySearchInput" class="search-input" placeholder="Search name, channel, IG…" autocomplete="off">
+                        <div class="toolbar-actions">
+                            <button id="addLegacyBtn" class="primary-btn">+ Old client</button>
+                            <button id="refreshLegacyBtn" class="icon-btn ghost" title="Refresh" aria-label="Refresh">↻</button>
+                        </div>
+                    </div>
+
+                    <div class="sub-tabs" role="tablist" id="legacySubTabs">
+                        <button class="sub-tab active" data-bucket="hot" role="tab">🔥 Hot <span class="count" id="countHot">0</span></button>
+                        <button class="sub-tab" data-bucket="this_week" role="tab">This week <span class="count" id="countWeek">0</span></button>
+                        <button class="sub-tab" data-bucket="7_15" role="tab">7–15d <span class="count" id="count715">0</span></button>
+                        <button class="sub-tab" data-bucket="15_30" role="tab">15–30d <span class="count" id="count1530">0</span></button>
+                        <button class="sub-tab" data-bucket="1_2m" role="tab">1–2 mo <span class="count" id="count12m">0</span></button>
+                        <button class="sub-tab" data-bucket="2_6m" role="tab">2–6 mo <span class="count" id="count26m">0</span></button>
+                        <button class="sub-tab" data-bucket="all" role="tab">All <span class="count" id="countAllLegacy">0</span></button>
+                    </div>
+
+                    <div class="panel-controls">
+                        <label class="inline-control">
+                            Channel
+                            <select id="legacyChannelFilter">
+                                <option value="">All</option>
+                            </select>
+                        </label>
+                        <label class="inline-control">
+                            Sort
+                            <select id="legacySortBy">
+                                <option value="oldest">Oldest contacted</option>
+                                <option value="newest">Newest contacted</option>
+                                <option value="name_asc">Name A–Z</option>
+                            </select>
+                        </label>
+                        <span class="counter" id="legacyCounter"></span>
+                    </div>
+
+                    <div id="legacyList" class="card-list" aria-live="polite"></div>
+                    <div id="noLegacyMessage" class="empty-state" style="display:none;">
+                        <h3>No old clients</h3>
+                        <p>Tap “+ Old client” to add one.</p>
+                    </div>
+                </section>
+
+                <!-- =================== CHANNELS =================== -->
+                <section id="channelsView" class="panel" role="tabpanel">
+                    <div class="panel-toolbar">
+                        <input type="search" id="channelSearchInput" class="search-input" placeholder="Search channels…" autocomplete="off">
+                        <div class="toolbar-actions">
+                            <button id="addChannelBtn" class="primary-btn">+ Channel</button>
+                            <button id="refreshChannelsBtn" class="icon-btn ghost" title="Refresh" aria-label="Refresh">↻</button>
+                        </div>
+                    </div>
+
+                    <div class="panel-controls">
+                        <span class="counter" id="channelCounter"></span>
+                    </div>
+
+                    <div id="channelsList" class="card-list" aria-live="polite"></div>
+                    <div id="noChannelsMessage" class="empty-state" style="display:none;">
+                        <h3>No channels</h3>
+                        <p>Tap “+ Channel” to add one.</p>
+                    </div>
+                </section>
+                </main>
+            </div>
         </div>
     </div>
 

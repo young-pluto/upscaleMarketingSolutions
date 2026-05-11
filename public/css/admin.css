@@ -143,33 +143,60 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .app-header-inner {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 10px 14px 8px;
-    gap: 8px;
+    padding: 10px 14px;
+    gap: 10px;
 }
+.menu-toggle { width: 36px; height: 36px; font-size: 18px; }
 .app-brand { font-weight: 700; letter-spacing: 0.5px; }
-.app-header-actions { display: flex; align-items: center; gap: 8px; }
+.app-header-current { font-size: 14px; font-weight: 600; color: var(--text-dim); margin-left: 4px; }
+.app-header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .user-info { font-size: 12px; color: var(--text-dim); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.app-tabs {
+/* Shell layout: sidebar + main */
+.app-shell { display: block; }
+.app-sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 240px;
+    background: var(--bg-elev-1);
+    border-right: 1px solid var(--border);
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    padding-top: calc(var(--safe-top) + 8px);
     display: flex;
-    gap: 2px;
-    overflow-x: auto;
-    padding: 0 10px 6px;
-    scrollbar-width: none;
+    flex-direction: column;
 }
-.app-tabs::-webkit-scrollbar { display: none; }
-.app-tab {
-    flex: 1 1 auto;
-    min-width: 90px;
-    padding: 8px 12px;
-    border-radius: 999px;
+.app-sidebar.open { transform: translateX(0); }
+.sidebar-nav { display: flex; flex-direction: column; gap: 2px; padding: 12px 10px; }
+.side-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
     color: var(--text-dim);
-    font-size: 13px;
-    font-weight: 600;
-    white-space: nowrap;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+    width: 100%;
 }
-.app-tab.active { background: var(--accent); color: #fff; }
+.side-link:hover { background: var(--bg-elev-2); color: var(--text); }
+.side-link.active { background: var(--accent); color: #fff; }
+.side-link-icon { font-size: 16px; width: 22px; text-align: center; }
+
+.sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 49;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+}
+.sidebar-backdrop.open { opacity: 1; pointer-events: auto; }
 
 /* =========================================================
    Main + panels
@@ -657,6 +684,30 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 /* =========================================================
    Desktop refinements
    ========================================================= */
+
+/* Date row helper for legacy clients */
+.date-row { display: flex; gap: 8px; align-items: center; }
+.date-row input { flex: 1 1 auto; }
+
+/* "Overdue" tint for last-contacted text */
+.overdue { color: var(--warning); }
+
+@media (min-width: 900px) {
+    .menu-toggle { display: none; }
+    .app-shell { display: flex; }
+    .app-sidebar {
+        position: sticky;
+        top: calc(var(--safe-top) + 56px);
+        height: calc(100vh - var(--safe-top) - 56px);
+        transform: none;
+        flex: 0 0 240px;
+        border-right: 1px solid var(--border);
+        align-self: flex-start;
+    }
+    .sidebar-backdrop { display: none; }
+    .app-main { flex: 1 1 auto; min-width: 0; }
+    .app-header-current { display: none; }
+}
 
 @media (min-width: 720px) {
     .app-main { padding: 16px 18px 80px; }
