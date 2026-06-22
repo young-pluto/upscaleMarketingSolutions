@@ -20,6 +20,59 @@
     --warning: #8a5a00;
     --warning-soft: #fff2c7;
     --shadow: 0 12px 32px rgba(24, 33, 47, 0.08);
+    --card-shadow: 0 8px 22px rgba(24, 33, 47, 0.05);
+
+    /* surfaces that were hardcoded white/light — themed so dark mode can swap them */
+    --scene: #eef4f1;
+    --header-bg: rgba(247, 248, 251, 0.94);
+    --bar-bg: rgba(255, 255, 255, 0.92);
+    --summary-bg: rgba(255, 255, 255, 0.76);
+    --empty-bg: rgba(255, 255, 255, 0.65);
+    --overlay-bg: rgba(247, 248, 251, 0.62);
+    --exhausted-bg: #f7f7f7;
+    --exhausted-dot-bg: #eceff3;
+    --toast-bg: #18212f;
+    --ig-bg: #ffeaf2;
+    --ig-fg: #b3125d;
+    --yt-bg: #ffe8e8;
+    --yt-fg: #c1121f;
+    --focus-ring: rgba(31, 122, 104, 0.18);
+}
+
+[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0e141b;
+    --surface: #171f29;
+    --surface-strong: #212c39;
+    --text: #e9eef4;
+    --muted: #98a6b8;
+    --line: #2a3644;
+    --accent: #2fa98f;
+    --accent-dark: #56cdb2;
+    --accent-soft: rgba(47, 169, 143, 0.16);
+    --blue: #6296f5;
+    --blue-soft: rgba(98, 150, 245, 0.16);
+    --danger: #f1736a;
+    --danger-soft: rgba(241, 115, 106, 0.16);
+    --warning: #e2af4d;
+    --warning-soft: rgba(226, 175, 77, 0.16);
+    --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    --card-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+
+    --scene: #0b1016;
+    --header-bg: rgba(14, 20, 27, 0.85);
+    --bar-bg: rgba(23, 31, 41, 0.92);
+    --summary-bg: rgba(23, 31, 41, 0.7);
+    --empty-bg: rgba(23, 31, 41, 0.5);
+    --overlay-bg: rgba(8, 12, 17, 0.7);
+    --exhausted-bg: #141b23;
+    --exhausted-dot-bg: #212c39;
+    --toast-bg: #2a3644;
+    --ig-bg: rgba(232, 62, 140, 0.18);
+    --ig-fg: #ff8fc0;
+    --yt-bg: rgba(193, 18, 31, 0.2);
+    --yt-fg: #ff8f8f;
+    --focus-ring: rgba(86, 205, 178, 0.28);
 }
 
 body {
@@ -56,7 +109,7 @@ a {
     display: grid;
     place-items: center;
     padding: 20px;
-    background: #eef4f1;
+    background: var(--scene);
 }
 
 .auth-card {
@@ -111,7 +164,7 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-    outline: 3px solid rgba(31, 122, 104, 0.18);
+    outline: 3px solid var(--focus-ring);
     border-color: var(--accent);
 }
 
@@ -239,7 +292,7 @@ textarea:focus {
     justify-content: space-between;
     gap: 14px;
     padding: calc(12px + env(safe-area-inset-top)) 14px 12px;
-    background: rgba(247, 248, 251, 0.94);
+    background: var(--header-bg);
     border-bottom: 1px solid var(--line);
     backdrop-filter: blur(14px);
 }
@@ -326,7 +379,7 @@ textarea:focus {
     margin: 4px -2px 14px;
     border: 1px solid var(--line);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.92);
+    background: var(--bar-bg);
     backdrop-filter: blur(12px);
 }
 
@@ -395,7 +448,7 @@ textarea:focus {
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--surface);
-    box-shadow: 0 8px 22px rgba(24, 33, 47, 0.05);
+    box-shadow: var(--card-shadow);
 }
 
 .lead-card {
@@ -501,7 +554,7 @@ textarea:focus {
 
 .status-pill.exhausted,
 .page-card.exhausted {
-    background: #f7f7f7;
+    background: var(--exhausted-bg);
     color: var(--muted);
 }
 
@@ -573,7 +626,7 @@ textarea:focus {
     border: 1px dashed var(--line);
     border-radius: 8px;
     padding: 24px 16px;
-    background: rgba(255, 255, 255, 0.65);
+    background: var(--empty-bg);
     color: var(--muted);
     text-align: center;
 }
@@ -638,7 +691,7 @@ textarea:focus {
     padding: 0 11px;
     border: 1px solid var(--line);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.76);
+    background: var(--summary-bg);
     color: var(--muted);
     cursor: pointer;
     font-size: 0.82rem;
@@ -795,7 +848,7 @@ textarea:focus {
 }
 
 .status-dot.exhausted {
-    background: #eceff3;
+    background: var(--exhausted-dot-bg);
     color: var(--muted);
 }
 
@@ -818,13 +871,13 @@ textarea:focus {
 }
 
 .platform-btn.instagram {
-    background: #ffeaf2;
-    color: #b3125d;
+    background: var(--ig-bg);
+    color: var(--ig-fg);
 }
 
 .platform-btn.youtube {
-    background: #ffe8e8;
-    color: #c1121f;
+    background: var(--yt-bg);
+    color: var(--yt-fg);
 }
 
 .lead-actions {
@@ -926,7 +979,7 @@ textarea:focus {
     z-index: 60;
     display: grid;
     place-items: center;
-    background: rgba(247, 248, 251, 0.62);
+    background: var(--overlay-bg);
 }
 
 .spinner {
@@ -1063,7 +1116,7 @@ textarea:focus {
     min-height: 44px;
     padding: 12px 14px;
     border-radius: 8px;
-    background: var(--text);
+    background: var(--toast-bg);
     color: white;
     font-weight: 750;
     opacity: 0;
@@ -1078,7 +1131,7 @@ textarea:focus {
 }
 
 .form-page {
-    background: #eef4f1;
+    background: var(--scene);
 }
 
 .submission-shell {
@@ -1170,5 +1223,155 @@ textarea:focus {
 @media (min-width: 1040px) {
     .item-list {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+/* ============================================================
+   Theme toggle
+   ============================================================ */
+.theme-toggle .icon-sun,
+.theme-toggle .icon-moon {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+
+.theme-toggle .icon-sun {
+    display: none;
+}
+
+[data-theme="dark"] .theme-toggle .icon-sun {
+    display: block;
+}
+
+[data-theme="dark"] .theme-toggle .icon-moon {
+    display: none;
+}
+
+/* Floating toggle for the public submission form (no header to host it) */
+.theme-fab {
+    position: fixed;
+    top: calc(14px + env(safe-area-inset-top));
+    right: 14px;
+    z-index: 40;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: var(--card-shadow);
+}
+
+/* ============================================================
+   Interaction polish (pointer devices only)
+   ============================================================ */
+.lead-card,
+.page-card,
+.message-card {
+    transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+@media (hover: hover) {
+    .ghost-btn:hover,
+    .icon-btn:hover,
+    .mini-btn:hover {
+        background: var(--line);
+    }
+
+    .tab-btn:not(.active):hover {
+        color: var(--text);
+        background: var(--surface-strong);
+    }
+
+    .chip-btn:hover {
+        background: var(--surface-strong);
+    }
+
+    .platform-btn:hover,
+    .sheet-action:hover,
+    .quick-action:hover {
+        opacity: 0.86;
+    }
+
+    .lead-card:hover,
+    .page-card:hover,
+    .message-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 30px rgba(24, 33, 47, 0.1);
+        border-color: var(--accent);
+    }
+
+    [data-theme="dark"] .lead-card:hover,
+    [data-theme="dark"] .page-card:hover,
+    [data-theme="dark"] .message-card:hover {
+        box-shadow: 0 16px 34px rgba(0, 0, 0, 0.5);
+    }
+}
+
+/* ============================================================
+   Wide-screen / desktop layout
+   ============================================================ */
+@media (min-width: 700px) {
+    /* Full-bleed header bar, but align its content to the centered container */
+    .app-header {
+        padding-top: calc(14px + env(safe-area-inset-top));
+        padding-bottom: 14px;
+        padding-left: max(28px, calc((100% - 1240px) / 2));
+        padding-right: max(28px, calc((100% - 1240px) / 2));
+    }
+
+    .app-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .app-header .eyebrow {
+        font-size: 0.72rem;
+    }
+
+    .header-actions {
+        gap: 10px;
+    }
+
+    .main-shell {
+        max-width: 1240px;
+        padding: 28px 28px 64px;
+    }
+
+    .tab-bar {
+        top: 86px;
+        gap: 5px;
+        padding: 5px;
+    }
+
+    .tab-btn {
+        min-height: 40px;
+        font-size: 0.84rem;
+    }
+
+    .analytics-panel {
+        margin-bottom: 16px;
+    }
+
+    .analytics-panel summary {
+        min-height: 44px;
+        font-size: 0.86rem;
+    }
+
+    .panel-toolbar h2 {
+        font-size: 1.18rem;
+    }
+
+    /* Center and balance the public form on large screens */
+    .form-page {
+        display: grid;
+        place-items: center;
+    }
+
+    .submission-shell {
+        padding-top: 40px;
+        padding-bottom: 40px;
+    }
+}
+
+@media (min-width: 1280px) {
+    .item-list {
+        gap: 14px;
     }
 }

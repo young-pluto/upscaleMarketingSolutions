@@ -4,9 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Lead Outreach Form</title>
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('lo-theme');
+                if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) {}
+        })();
+    </script>
     <link rel="stylesheet" href="/css/lead-outreach.css">
 </head>
 <body class="form-page">
+    <button id="themeToggle" class="icon-btn theme-toggle theme-fab" type="button" aria-label="Toggle dark mode">
+        <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+    </button>
     <main class="submission-shell">
         <header class="submission-header">
             <p class="eyebrow">Lead Outreach</p>
@@ -44,5 +57,17 @@
     </main>
 
     <script type="module" src="/js/lead-outreach-form.js"></script>
+    <script>
+        (function () {
+            var btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+                var next = cur === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', next);
+                try { localStorage.setItem('lo-theme', next); } catch (e) {}
+            });
+        })();
+    </script>
 </body>
 </html>
