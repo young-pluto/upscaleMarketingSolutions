@@ -1,5 +1,12 @@
 import { getDatabase } from './_firebase-admin.js';
 
+function isYoutubePromotionOrder(order) {
+    return order?.app === 'youtube-promotion'
+        || Boolean(order?.youtubeLink)
+        || Boolean(order?.orderID)
+        || Boolean(order?.paypalTransactionId);
+}
+
 export default async function handler(req, res) {
     // Initialize Firebase if needed
     const database = getDatabase();
@@ -28,10 +35,14 @@ export default async function handler(req, res) {
         const orders = [];
         if (snapshot.exists()) {
             snapshot.forEach((childSnapshot) => {
-                orders.push({
+                const order = {
                     firebaseKey: childSnapshot.key,
                     ...childSnapshot.val()
-                });
+                };
+
+                if (isYoutubePromotionOrder(order)) {
+                    orders.push(order);
+                }
             });
         }
 

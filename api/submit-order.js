@@ -48,6 +48,7 @@ export default async function handler(req, res) {
 
         // Prepare the order data
         const orderData = {
+            app: 'youtube-promotion',
             orderID,
             amount: parseFloat(amount),
             currency: currency || 'USD',

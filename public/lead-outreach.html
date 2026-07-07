@@ -59,7 +59,7 @@
             <details class="analytics-panel" aria-label="Lead analytics">
                 <summary>
                     <span>Insights</span>
-                    <strong><span id="metricTotal">0</span> total</strong>
+                    <strong><span id="summaryContacted">0</span> contacted · <span id="summaryConverted">0</span> converted</strong>
                 </summary>
                 <div class="analytics-header">
                     <select id="analyticsFilter" aria-label="Filter analytics range">
@@ -71,6 +71,10 @@
                 </div>
                 <div class="metric-grid">
                     <article class="metric-card">
+                        <span>Total</span>
+                        <strong id="metricTotal">0</strong>
+                    </article>
+                    <article class="metric-card">
                         <span>New</span>
                         <strong id="metricNew">0</strong>
                     </article>
@@ -81,6 +85,10 @@
                     <article class="metric-card">
                         <span>Converted</span>
                         <strong id="metricConverted">0</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Conv. rate</span>
+                        <strong id="metricRate">—</strong>
                     </article>
                     <article class="metric-card">
                         <span>Not useful</span>

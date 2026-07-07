@@ -251,10 +251,18 @@ class LeadOutreachBoard {
         const byStatus = (status) => leads.filter((lead) => (lead.leadStatus || 'new') === status).length;
         const byDiscardReason = (reason) => leads.filter((lead) => lead.leadStatus === 'discarded' && lead.discardReason === reason).length;
 
+        const converted = byStatus('converted');
+        // Converted leads passed through "contacted", so count them in the contacted total
+        const contactedTotal = byStatus('contacted') + converted;
+        const rate = contactedTotal ? `${Math.round((converted / contactedTotal) * 100)}%` : '—';
+
+        document.getElementById('summaryContacted').textContent = contactedTotal;
+        document.getElementById('summaryConverted').textContent = converted;
         document.getElementById('metricTotal').textContent = leads.length;
         document.getElementById('metricNew').textContent = byStatus('new');
-        document.getElementById('metricContacted').textContent = byStatus('contacted');
-        document.getElementById('metricConverted').textContent = byStatus('converted');
+        document.getElementById('metricContacted').textContent = contactedTotal;
+        document.getElementById('metricConverted').textContent = converted;
+        document.getElementById('metricRate').textContent = rate;
         document.getElementById('metricNotUseful').textContent = byDiscardReason('not_useful');
         document.getElementById('metricNotRelevant').textContent = byDiscardReason('not_relevant');
     }

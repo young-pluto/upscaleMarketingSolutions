@@ -4,369 +4,349 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#0f0f10">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="robots" content="noindex, nofollow">
     <title>USM Admin</title>
     <link rel="stylesheet" href="css/admin.css">
 </head>
 <body>
-    <div class="admin-container">
-        <!-- Login Screen -->
-        <div id="loginScreen" class="login-screen">
-            <div class="login-form">
+
+    <!-- ============ ICON SPRITE ============ -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+        <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8v8a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8z"/><path d="M3.3 7l8.7 5 8.7-5"/><path d="M12 22V12"/></symbol>
+        <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+        <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+        <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></symbol>
+        <symbol id="i-radio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><path d="M7.76 16.24a6 6 0 0 1 0-8.49"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 19.07a10 10 0 0 1 0-14.14"/></symbol>
+        <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></symbol>
+        <symbol id="i-chart" viewBox="0 0 24 24"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></symbol>
+        <symbol id="i-flask" viewBox="0 0 24 24"><path d="M10 2v6L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 8V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></symbol>
+        <symbol id="i-edit" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+        <symbol id="i-external" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></symbol>
+        <symbol id="i-play" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="4"/><path d="M10 9.5v5l4.5-2.5z"/></symbol>
+        <symbol id="i-instagram" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01"/></symbol>
+        <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+        <symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
+        <symbol id="i-cal-check" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M9 16l2 2 4-4"/></symbol>
+        <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></symbol>
+        <symbol id="i-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+        <symbol id="i-note" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></symbol>
+    </svg>
+
+    <!-- ============ LOGIN ============ -->
+    <div id="loginScreen" class="login-screen" hidden>
+        <div class="login-card">
+            <div class="login-brand">
+                <div class="login-mark">U</div>
                 <h1>USM Admin</h1>
-                <form id="loginForm">
-                    <div class="form-group">
-                        <label for="adminEmail">Email</label>
-                        <input type="email" id="adminEmail" required placeholder="admin@example.com" autocomplete="username">
-                    </div>
-                    <div class="form-group">
-                        <label for="adminPassword">Password</label>
-                        <input type="password" id="adminPassword" required placeholder="Enter password" autocomplete="current-password">
-                    </div>
-                    <button type="submit" class="login-btn">Login</button>
-                </form>
-                <div id="loginError" class="error-message"></div>
-                <div class="back-link">
-                    <a href="/">← Back to Main Site</a>
-                </div>
+                <p>Sign in to manage operations</p>
             </div>
-        </div>
-
-        <!-- Dashboard Screen -->
-        <div id="dashboardScreen" class="dashboard-screen" style="display: none;">
-            <header class="app-header">
-                <div class="app-header-inner">
-                    <button id="menuToggle" class="icon-btn ghost menu-toggle" aria-label="Open menu">☰</button>
-                    <div class="app-brand">USM</div>
-                    <div class="app-header-current" id="activeViewLabel">Orders</div>
-                    <div class="app-header-actions">
-                        <span id="adminUserInfo" class="user-info"></span>
-                        <button id="logoutBtn" class="icon-btn ghost" title="Logout" aria-label="Logout">⎋</button>
-                    </div>
-                </div>
-            </header>
-
-            <div class="app-shell">
-                <aside id="appSidebar" class="app-sidebar" aria-label="Navigation">
-                    <nav class="sidebar-nav" role="tablist">
-                        <button class="side-link active" data-view="orders" role="tab">
-                            <span class="side-link-icon">📦</span>
-                            <span class="side-link-label">Orders</span>
-                        </button>
-                        <button class="side-link" data-view="clients" role="tab">
-                            <span class="side-link-icon">👥</span>
-                            <span class="side-link-label">Clients</span>
-                        </button>
-                        <button class="side-link" data-view="legacy-clients" role="tab">
-                            <span class="side-link-icon">🗂</span>
-                            <span class="side-link-label">Old Clients</span>
-                        </button>
-                        <button class="side-link" data-view="trial-campaigns" role="tab">
-                            <span class="side-link-icon">🎯</span>
-                            <span class="side-link-label">Trial Leads</span>
-                        </button>
-                        <button class="side-link" data-view="channels" role="tab">
-                            <span class="side-link-icon">📡</span>
-                            <span class="side-link-label">Channels</span>
-                        </button>
-                    </nav>
-                </aside>
-                <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
-
-                <main class="app-main">
-                <!-- =================== ORDERS =================== -->
-                <section id="ordersView" class="panel active" role="tabpanel">
-                    <div class="panel-toolbar">
-                        <input type="search" id="searchInput" class="search-input" placeholder="Search name, email, link…" autocomplete="off">
-                        <div class="toolbar-actions">
-                            <button id="toggleStatsBtn" class="icon-btn ghost" title="Toggle stats" aria-label="Toggle stats">📊</button>
-                            <button id="toggleTestOrdersBtn" class="icon-btn ghost" title="Toggle test orders" aria-label="Toggle test orders">🧪</button>
-                            <button id="refreshBtn" class="icon-btn ghost" title="Refresh" aria-label="Refresh">↻</button>
-                        </div>
-                    </div>
-
-                    <div id="orderClientFilterBar" class="client-filter-bar" style="display:none;">
-                        <span>Filtered by client: <strong id="orderClientFilterName"></strong></span>
-                        <button id="clearOrderClientFilter" class="link-btn">Clear</button>
-                    </div>
-
-                    <div id="ordersStats" class="stats-row" hidden>
-                        <div class="stat-pill"><span class="stat-pill-label">Revenue</span><span class="stat-pill-value" id="totalRevenue">$0</span></div>
-                        <div class="stat-pill"><span class="stat-pill-label">Orders</span><span class="stat-pill-value" id="totalOrders">0</span></div>
-                        <div class="stat-pill"><span class="stat-pill-label">Pending</span><span class="stat-pill-value" id="pendingOrders">0</span></div>
-                        <div class="stat-pill"><span class="stat-pill-label">Done</span><span class="stat-pill-value" id="completedOrders">0</span></div>
-                    </div>
-
-                    <div class="sub-tabs" role="tablist" id="orderSubTabs">
-                        <button class="sub-tab active" data-status="pending" role="tab">Pending <span class="count" id="countPending">0</span></button>
-                        <button class="sub-tab" data-status="in_progress" role="tab">In Progress <span class="count" id="countInProgress">0</span></button>
-                        <button class="sub-tab" data-status="completed" role="tab">Completed <span class="count" id="countCompleted">0</span></button>
-                        <button class="sub-tab" data-status="cancelled" role="tab">Cancelled <span class="count" id="countCancelled">0</span></button>
-                    </div>
-
-                    <div class="panel-controls">
-                        <label class="inline-control">
-                            Show
-                            <select id="ordersLimitSelect">
-                                <option value="10" selected>10</option>
-                                <option value="20">20</option>
-                                <option value="50">50</option>
-                                <option value="100">100</option>
-                                <option value="all">All</option>
-                            </select>
-                        </label>
-                        <label class="inline-control">
-                            Sort
-                            <select id="sortBy">
-                                <option value="timestamp_desc">Newest</option>
-                                <option value="timestamp_asc">Oldest</option>
-                                <option value="amount_desc">$ High</option>
-                                <option value="amount_asc">$ Low</option>
-                            </select>
-                        </label>
-                        <span class="counter" id="orderCounter"></span>
-                    </div>
-
-                    <div id="ordersList" class="card-list" aria-live="polite"></div>
-
-                    <div id="loadingIndicator" class="loading-indicator">
-                        <div class="spinner"></div>Loading…
-                    </div>
-                    <div id="noOrdersMessage" class="empty-state" style="display:none;">
-                        <h3>No orders</h3>
-                        <p>Nothing matches your current filters.</p>
-                    </div>
-                </section>
-
-                <!-- =================== CLIENT DETAIL =================== -->
-                <section id="clientDetailView" class="panel detail-panel" role="tabpanel">
-                    <div class="detail-header">
-                        <button id="clientDetailBack" class="icon-btn ghost" aria-label="Back">←</button>
-                        <h2 id="clientDetailTitle">Client</h2>
-                        <div class="detail-header-actions">
-                            <button class="danger-btn" id="clientDetailDelete">🗑</button>
-                            <button class="primary-btn" id="clientDetailSave">Save</button>
-                        </div>
-                    </div>
-                    <div id="clientDetailBody" class="detail-body"></div>
-                </section>
-
-                <!-- =================== LEGACY CLIENT DETAIL =================== -->
-                <section id="legacyDetailView" class="panel detail-panel" role="tabpanel">
-                    <div class="detail-header">
-                        <button id="legacyDetailBack" class="icon-btn ghost" aria-label="Back">←</button>
-                        <h2 id="legacyDetailTitle">Old client</h2>
-                        <div class="detail-header-actions">
-                            <button class="danger-btn" id="legacyDetailDelete">🗑</button>
-                            <button class="primary-btn" id="legacyDetailSave">Save</button>
-                        </div>
-                    </div>
-                    <div id="legacyDetailBody" class="detail-body"></div>
-                </section>
-
-                <!-- =================== CLIENTS =================== -->
-                <section id="clientsView" class="panel" role="tabpanel">
-                    <div class="panel-toolbar">
-                        <input type="search" id="clientSearchInput" class="search-input" placeholder="Search clients…" autocomplete="off">
-                        <div class="toolbar-actions">
-                            <button id="addClientBtn" class="primary-btn">+ Client</button>
-                            <button id="refreshClientsBtn" class="icon-btn ghost" title="Refresh" aria-label="Refresh">↻</button>
-                        </div>
-                    </div>
-
-                    <div class="panel-controls">
-                        <label class="inline-control">
-                            Sort
-                            <select id="clientSortBy">
-                                <option value="name_asc">Name A–Z</option>
-                                <option value="orders_desc">Most orders</option>
-                                <option value="spent_desc">Highest spend</option>
-                                <option value="recent_desc">Recent activity</option>
-                            </select>
-                        </label>
-                        <span class="counter" id="clientCounter"></span>
-                    </div>
-
-                    <div id="clientsList" class="card-list" aria-live="polite"></div>
-                    <div id="noClientsMessage" class="empty-state" style="display:none;">
-                        <h3>No clients yet</h3>
-                        <p>Tap “+ Client” to add one.</p>
-                    </div>
-                </section>
-
-                <!-- =================== TRIAL LEADS =================== -->
-                <section id="trialCampaignsView" class="panel" role="tabpanel">
-                    <div class="panel-toolbar">
-                        <input type="search" id="trialSearchInput" class="search-input" placeholder="Search name, genre, link…" autocomplete="off">
-                        <div class="toolbar-actions">
-                            <button id="toggleTrialStatsBtn" class="icon-btn ghost" title="Toggle stats" aria-label="Toggle stats">📊</button>
-                            <button id="trialRefreshBtn" class="icon-btn ghost" title="Refresh" aria-label="Refresh">↻</button>
-                        </div>
-                    </div>
-
-                    <div id="trialStats" class="stats-row" hidden>
-                        <div class="stat-pill"><span class="stat-pill-label">Total</span><span class="stat-pill-value" id="totalTrialLeads">0</span></div>
-                        <div class="stat-pill"><span class="stat-pill-label">New</span><span class="stat-pill-value" id="newTrialLeads">0</span></div>
-                        <div class="stat-pill"><span class="stat-pill-label">Contacted</span><span class="stat-pill-value" id="contactedTrialLeads">0</span></div>
-                        <div class="stat-pill"><span class="stat-pill-label">Hip-Hop</span><span class="stat-pill-value" id="hipHopTrialLeads">0</span></div>
-                    </div>
-
-                    <div class="sub-tabs" role="tablist" id="trialSubTabs">
-                        <button class="sub-tab active" data-status="new" role="tab">New <span class="count" id="countTrialNew">0</span></button>
-                        <button class="sub-tab" data-status="completed" role="tab">Completed <span class="count" id="countTrialCompleted">0</span></button>
-                        <button class="sub-tab" data-status="contacted" role="tab">Contacted <span class="count" id="countTrialContacted">0</span></button>
-                        <button class="sub-tab" data-status="archived" role="tab">Archived <span class="count" id="countTrialArchived">0</span></button>
-                    </div>
-
-                    <div class="panel-controls">
-                        <label class="inline-control">
-                            Show
-                            <select id="trialLimitSelect">
-                                <option value="10" selected>10</option>
-                                <option value="20">20</option>
-                                <option value="50">50</option>
-                                <option value="100">100</option>
-                                <option value="all">All</option>
-                            </select>
-                        </label>
-                        <label class="inline-control">
-                            Genre
-                            <select id="trialGenreFilter">
-                                <option value="">All</option>
-                                <option value="hip-hop">Hip-Hop</option>
-                                <option value="rnb-soul">R&B / Soul</option>
-                                <option value="pop">Pop</option>
-                                <option value="electronic">Electronic</option>
-                                <option value="afrobeats">Afrobeats</option>
-                                <option value="rock">Rock</option>
-                                <option value="latin">Latin / Urbano</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </label>
-                        <label class="inline-control">
-                            Sort
-                            <select id="trialSortBy">
-                                <option value="timestamp_desc">Newest</option>
-                                <option value="timestamp_asc">Oldest</option>
-                                <option value="name_asc">Name A–Z</option>
-                                <option value="genre_asc">Genre A–Z</option>
-                            </select>
-                        </label>
-                        <span class="counter" id="trialCounter"></span>
-                    </div>
-
-                    <div id="trialList" class="card-list" aria-live="polite"></div>
-                    <div id="trialLoadingIndicator" class="loading-indicator">
-                        <div class="spinner"></div>Loading…
-                    </div>
-                    <div id="noTrialCampaignsMessage" class="empty-state" style="display:none;">
-                        <h3>No leads</h3>
-                        <p>Nothing matches your current filters.</p>
-                    </div>
-                </section>
-
-                <!-- =================== OLD CLIENTS =================== -->
-                <section id="legacyClientsView" class="panel" role="tabpanel">
-                    <div class="panel-toolbar">
-                        <input type="search" id="legacySearchInput" class="search-input" placeholder="Search name, channel, IG…" autocomplete="off">
-                        <div class="toolbar-actions">
-                            <button id="addLegacyBtn" class="primary-btn">+ Old client</button>
-                            <button id="refreshLegacyBtn" class="icon-btn ghost" title="Refresh" aria-label="Refresh">↻</button>
-                        </div>
-                    </div>
-
-                    <div class="sub-tabs" role="tablist" id="legacySubTabs">
-                        <button class="sub-tab active" data-bucket="hot" role="tab">🔥 Hot <span class="count" id="countHot">0</span></button>
-                        <button class="sub-tab" data-bucket="this_week" role="tab">This week <span class="count" id="countWeek">0</span></button>
-                        <button class="sub-tab" data-bucket="7_15" role="tab">7–15d <span class="count" id="count715">0</span></button>
-                        <button class="sub-tab" data-bucket="15_30" role="tab">15–30d <span class="count" id="count1530">0</span></button>
-                        <button class="sub-tab" data-bucket="1_2m" role="tab">1–2 mo <span class="count" id="count12m">0</span></button>
-                        <button class="sub-tab" data-bucket="2_6m" role="tab">2–6 mo <span class="count" id="count26m">0</span></button>
-                        <button class="sub-tab" data-bucket="all" role="tab">All <span class="count" id="countAllLegacy">0</span></button>
-                    </div>
-
-                    <div class="panel-controls">
-                        <label class="inline-control">
-                            Channel
-                            <select id="legacyChannelFilter">
-                                <option value="">All</option>
-                            </select>
-                        </label>
-                        <label class="inline-control">
-                            Sort
-                            <select id="legacySortBy">
-                                <option value="oldest">Oldest contacted</option>
-                                <option value="newest">Newest contacted</option>
-                                <option value="name_asc">Name A–Z</option>
-                            </select>
-                        </label>
-                        <span class="counter" id="legacyCounter"></span>
-                    </div>
-
-                    <div id="legacyList" class="card-list" aria-live="polite"></div>
-                    <div id="noLegacyMessage" class="empty-state" style="display:none;">
-                        <h3>No old clients</h3>
-                        <p>Tap “+ Old client” to add one.</p>
-                    </div>
-                </section>
-
-                <!-- =================== CHANNELS =================== -->
-                <section id="channelsView" class="panel" role="tabpanel">
-                    <div class="panel-toolbar">
-                        <input type="search" id="channelSearchInput" class="search-input" placeholder="Search channels…" autocomplete="off">
-                        <div class="toolbar-actions">
-                            <button id="addChannelBtn" class="primary-btn">+ Channel</button>
-                            <button id="refreshChannelsBtn" class="icon-btn ghost" title="Refresh" aria-label="Refresh">↻</button>
-                        </div>
-                    </div>
-
-                    <div class="panel-controls">
-                        <span class="counter" id="channelCounter"></span>
-                    </div>
-
-                    <div id="channelsList" class="card-list" aria-live="polite"></div>
-                    <div id="noChannelsMessage" class="empty-state" style="display:none;">
-                        <h3>No channels</h3>
-                        <p>Tap “+ Channel” to add one.</p>
-                    </div>
-                </section>
-                </main>
-            </div>
+            <form id="loginForm">
+                <label class="field">
+                    <span>Email</span>
+                    <input type="email" id="adminEmail" required placeholder="you@example.com" autocomplete="username" inputmode="email">
+                </label>
+                <label class="field">
+                    <span>Password</span>
+                    <input type="password" id="adminPassword" required placeholder="••••••••" autocomplete="current-password">
+                </label>
+                <button type="submit" class="btn btn-primary btn-block" id="loginBtn">Sign in</button>
+            </form>
+            <div id="loginError" class="login-error" hidden></div>
         </div>
     </div>
 
-    <!-- Bottom Sheet (used for view, edit order, edit lead, edit client) -->
+    <!-- ============ APP ============ -->
+    <div id="app" hidden>
+        <header class="topbar">
+            <div class="topbar-inner">
+                <button id="topbarBack" class="ibtn topbar-back" aria-label="Go back" hidden><svg><use href="#i-back"/></svg></button>
+                <div class="topbar-brand">USM</div>
+                <h1 class="topbar-title" id="viewTitle">Orders</h1>
+                <div class="topbar-actions">
+                    <span id="connState" class="conn conn-on" title="Realtime sync is live"><span class="conn-dot"></span><span class="conn-label">Live</span></span>
+                    <span id="adminUserInfo" class="topbar-user"></span>
+                    <button id="logoutBtn" class="ibtn" title="Sign out" aria-label="Sign out"><svg><use href="#i-logout"/></svg></button>
+                </div>
+            </div>
+        </header>
+
+        <main class="main" id="main">
+
+            <!-- ============ ORDERS ============ -->
+            <section id="view-orders" class="view">
+                <div class="toolbar">
+                    <label class="search">
+                        <svg><use href="#i-search"/></svg>
+                        <input type="search" id="ordersSearch" placeholder="Search orders" autocomplete="off">
+                    </label>
+                    <button id="ordersStatsBtn" class="ibtn" title="Show totals" aria-label="Show totals" aria-pressed="false"><svg><use href="#i-chart"/></svg></button>
+                    <button id="ordersTestBtn" class="ibtn" title="Show test orders" aria-label="Show test orders" aria-pressed="false"><svg><use href="#i-flask"/></svg></button>
+                </div>
+
+                <div id="ordersClientBar" class="filter-note" hidden>
+                    <span>Orders for <strong id="ordersClientName"></strong></span>
+                    <button id="ordersClientClear" class="btn btn-mini">Clear</button>
+                </div>
+
+                <div id="ordersStats" class="stats" hidden>
+                    <div class="stat"><span class="stat-label">Revenue</span><span class="stat-value" id="osRevenue">$0</span></div>
+                    <div class="stat"><span class="stat-label">Orders</span><span class="stat-value" id="osTotal">0</span></div>
+                    <div class="stat"><span class="stat-label">Pending</span><span class="stat-value" id="osPending">0</span></div>
+                    <div class="stat"><span class="stat-label">Done</span><span class="stat-value" id="osDone">0</span></div>
+                </div>
+
+                <div class="chip-row" id="ordersTabs" role="tablist"></div>
+
+                <div class="list-head">
+                    <span class="count" id="ordersCount"></span>
+                    <label class="sort">
+                        Sort
+                        <select id="ordersSort">
+                            <option value="newest">Newest</option>
+                            <option value="oldest">Oldest</option>
+                            <option value="amount_desc">$ high → low</option>
+                            <option value="amount_asc">$ low → high</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div id="ordersList" class="list" aria-live="polite"></div>
+                <button id="ordersMore" class="btn btn-more" hidden>Show more</button>
+                <div id="ordersEmpty" class="empty" hidden>
+                    <svg><use href="#i-box"/></svg>
+                    <h3>No orders here</h3>
+                    <p>Nothing matches this status or search.</p>
+                </div>
+            </section>
+
+            <!-- ============ CLIENTS ============ -->
+            <section id="view-clients" class="view" hidden>
+                <div class="toolbar">
+                    <label class="search">
+                        <svg><use href="#i-search"/></svg>
+                        <input type="search" id="clientsSearch" placeholder="Search clients" autocomplete="off">
+                    </label>
+                    <button id="clientsAdd" class="btn btn-primary"><svg><use href="#i-plus"/></svg>Client</button>
+                </div>
+
+                <div class="chip-row" id="clientsTabs" role="tablist"></div>
+
+                <div class="list-head">
+                    <span class="count" id="clientsCount"></span>
+                    <label class="sort">
+                        Sort
+                        <select id="clientsSort">
+                            <option value="recent">Recent activity</option>
+                            <option value="name">Name A–Z</option>
+                            <option value="orders">Most orders</option>
+                            <option value="spent">Highest spend</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div id="clientsList" class="list" aria-live="polite"></div>
+                <div id="clientsEmpty" class="empty" hidden>
+                    <svg><use href="#i-users"/></svg>
+                    <h3>No clients</h3>
+                    <p>Add your first client with the button above.</p>
+                </div>
+            </section>
+
+            <!-- ============ CLIENT DETAIL ============ -->
+            <section id="view-client-detail" class="view view-detail" hidden>
+                <div class="detail-bar">
+                    <button id="cdBack" class="ibtn" aria-label="Back to clients"><svg><use href="#i-back"/></svg></button>
+                    <h2 id="cdTitle">Client</h2>
+                    <button id="cdDelete" class="ibtn ibtn-danger" title="Delete client" aria-label="Delete client"><svg><use href="#i-trash"/></svg></button>
+                    <button id="cdSave" class="btn btn-primary">Save</button>
+                </div>
+                <div id="cdBody" class="detail-body"></div>
+            </section>
+
+            <!-- ============ TRIAL LEADS ============ -->
+            <section id="view-leads" class="view" hidden>
+                <div class="toolbar">
+                    <label class="search">
+                        <svg><use href="#i-search"/></svg>
+                        <input type="search" id="leadsSearch" placeholder="Search leads" autocomplete="off">
+                    </label>
+                    <button id="leadsStatsBtn" class="ibtn" title="Show totals" aria-label="Show totals" aria-pressed="false"><svg><use href="#i-chart"/></svg></button>
+                </div>
+
+                <div id="leadsStats" class="stats" hidden>
+                    <div class="stat"><span class="stat-label">Total</span><span class="stat-value" id="lsTotal">0</span></div>
+                    <div class="stat"><span class="stat-label">Trialed</span><span class="stat-value" id="lsTrialed">0</span></div>
+                    <div class="stat"><span class="stat-label">Converted</span><span class="stat-value" id="lsConverted">0</span></div>
+                    <div class="stat"><span class="stat-label">Conv. rate</span><span class="stat-value" id="lsRate">—</span></div>
+                </div>
+
+                <div class="chip-row" id="leadsTabs" role="tablist"></div>
+                <div class="chip-row chip-row-sub" id="leadsActivity" role="tablist"></div>
+
+                <div class="list-head">
+                    <span class="count" id="leadsCount"></span>
+                    <label class="sort">
+                        Genre
+                        <select id="leadsGenre">
+                            <option value="">All</option>
+                            <option value="hip-hop">Hip-Hop</option>
+                            <option value="rnb-soul">R&B / Soul</option>
+                            <option value="pop">Pop</option>
+                            <option value="electronic">Electronic</option>
+                            <option value="afrobeats">Afrobeats</option>
+                            <option value="rock">Rock</option>
+                            <option value="latin">Latin / Urbano</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </label>
+                    <label class="sort">
+                        Sort
+                        <select id="leadsSort">
+                            <option value="newest">Newest</option>
+                            <option value="oldest">Oldest</option>
+                            <option value="name">Name A–Z</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div id="leadsList" class="list" aria-live="polite"></div>
+                <button id="leadsMore" class="btn btn-more" hidden>Show more</button>
+                <div id="leadsEmpty" class="empty" hidden>
+                    <svg><use href="#i-target"/></svg>
+                    <h3>No leads</h3>
+                    <p>Nothing matches these filters.</p>
+                </div>
+            </section>
+
+            <!-- ============ OLD CLIENTS ============ -->
+            <section id="view-old" class="view" hidden>
+                <div class="toolbar">
+                    <label class="search">
+                        <svg><use href="#i-search"/></svg>
+                        <input type="search" id="oldSearch" placeholder="Search old clients" autocomplete="off">
+                    </label>
+                    <button id="oldAdd" class="btn btn-primary"><svg><use href="#i-plus"/></svg>Add</button>
+                </div>
+
+                <div class="chip-row" id="oldTabs" role="tablist"></div>
+
+                <div class="list-head">
+                    <span class="count" id="oldCount"></span>
+                    <label class="sort">
+                        Channel
+                        <select id="oldChannel"><option value="">All</option></select>
+                    </label>
+                    <label class="sort">
+                        Sort
+                        <select id="oldSort">
+                            <option value="oldest">Oldest contact</option>
+                            <option value="newest">Newest contact</option>
+                            <option value="name">Name A–Z</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div id="oldList" class="list" aria-live="polite"></div>
+                <div id="oldEmpty" class="empty" hidden>
+                    <svg><use href="#i-history"/></svg>
+                    <h3>No old clients</h3>
+                    <p>Add one with the button above.</p>
+                </div>
+            </section>
+
+            <!-- ============ OLD CLIENT DETAIL ============ -->
+            <section id="view-old-detail" class="view view-detail" hidden>
+                <div class="detail-bar">
+                    <button id="odBack" class="ibtn" aria-label="Back to old clients"><svg><use href="#i-back"/></svg></button>
+                    <h2 id="odTitle">Old client</h2>
+                    <button id="odDelete" class="ibtn ibtn-danger" title="Delete" aria-label="Delete"><svg><use href="#i-trash"/></svg></button>
+                    <button id="odSave" class="btn btn-primary">Save</button>
+                </div>
+                <div id="odBody" class="detail-body"></div>
+            </section>
+
+            <!-- ============ CHANNELS ============ -->
+            <section id="view-channels" class="view" hidden>
+                <div class="toolbar">
+                    <label class="search">
+                        <svg><use href="#i-search"/></svg>
+                        <input type="search" id="chSearch" placeholder="Search channels" autocomplete="off">
+                    </label>
+                    <button id="chAdd" class="btn btn-primary"><svg><use href="#i-plus"/></svg>Channel</button>
+                </div>
+
+                <div class="list-head">
+                    <span class="count" id="chCount"></span>
+                </div>
+
+                <div id="chList" class="list" aria-live="polite"></div>
+                <div id="chEmpty" class="empty" hidden>
+                    <svg><use href="#i-radio"/></svg>
+                    <h3>No channels</h3>
+                    <p>Channels group clients by the promo channel that serves them.</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- ============ NAV ============ -->
+        <nav class="tabbar" aria-label="Sections">
+            <button class="tab active" data-nav="orders" aria-label="Orders">
+                <svg><use href="#i-box"/></svg><span>Orders</span><em class="tab-badge" id="badgeOrders" hidden></em>
+            </button>
+            <button class="tab" data-nav="clients" aria-label="Clients">
+                <svg><use href="#i-users"/></svg><span>Clients</span>
+            </button>
+            <button class="tab" data-nav="leads" aria-label="Trial leads">
+                <svg><use href="#i-target"/></svg><span>Leads</span><em class="tab-badge" id="badgeLeads" hidden></em>
+            </button>
+            <button class="tab" data-nav="old" aria-label="Old clients">
+                <svg><use href="#i-history"/></svg><span>Old</span>
+            </button>
+            <button class="tab" data-nav="channels" aria-label="Channels">
+                <svg><use href="#i-radio"/></svg><span>Channels</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- ============ SHEET ============ -->
     <div id="sheet" class="sheet" aria-hidden="true">
         <div class="sheet-backdrop" data-sheet-close></div>
         <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
-            <div class="sheet-grabber" data-sheet-close></div>
+            <div class="sheet-grabber" data-sheet-close><span></span></div>
             <div class="sheet-header">
                 <h2 id="sheetTitle">Details</h2>
-                <button class="icon-btn ghost" data-sheet-close aria-label="Close">✕</button>
+                <button class="ibtn" data-sheet-close aria-label="Close"><svg><use href="#i-x"/></svg></button>
             </div>
             <div class="sheet-body" id="sheetBody"></div>
             <div class="sheet-footer" id="sheetFooter"></div>
         </div>
     </div>
 
-    <!-- Toast -->
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
-
-    <!-- Confirm Dialog -->
-    <div id="confirmDialog" class="sheet" aria-hidden="true">
+    <!-- ============ CONFIRM ============ -->
+    <div id="confirmBox" class="sheet sheet-confirm" aria-hidden="true">
         <div class="sheet-backdrop" data-confirm-close></div>
-        <div class="sheet-panel sheet-panel-narrow" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <div class="sheet-panel sheet-panel-sm" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
             <div class="sheet-header">
                 <h2 id="confirmTitle">Are you sure?</h2>
             </div>
             <div class="sheet-body" id="confirmBody"></div>
             <div class="sheet-footer">
-                <button class="ghost-btn" data-confirm-close>Cancel</button>
-                <button class="danger-btn" id="confirmOkBtn">Confirm</button>
+                <button class="btn btn-ghost" data-confirm-close>Cancel</button>
+                <button class="btn btn-danger" id="confirmOk">Delete</button>
             </div>
         </div>
     </div>
 
-    <script type="module" src="js/firebase-config.js"></script>
+    <!-- ============ TOAST ============ -->
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
     <script type="module" src="js/admin.js"></script>
 </body>
 </html>
