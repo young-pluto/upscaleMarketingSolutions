@@ -375,7 +375,10 @@ function applyRoute() {
     document.title = `${cfg.title} · USM Admin`;
 
     cfg.render();
-    if (isNewView) window.scrollTo(0, 0);
+    if (isNewView) {
+        window.scrollTo(0, 0);          // desktop: window scrolls
+        $('main').scrollTo(0, 0);       // mobile: <main> scrolls
+    }
 }
 
 /* ============ AUTH ============ */

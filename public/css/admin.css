@@ -49,7 +49,10 @@ html { height: 100%; }
 
 body {
     margin: 0;
-    min-height: 100%;
+    height: 100%;
+    /* App-shell: the page itself never scrolls on mobile — <main> does.
+       Keeps the tab bar clear of Safari's bottom URL bar. */
+    overflow: hidden;
     background: var(--bg);
     color: var(--text);
     font-family: var(--font);
@@ -150,8 +153,9 @@ code {
 /* ============ LOGIN ============ */
 
 .login-screen {
-    min-height: 100vh;
-    min-height: 100dvh;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -254,10 +258,24 @@ code {
 
 /* ============ LAYOUT ============ */
 
+/* topbar / scrolling main / tabbar, all inside the visible viewport */
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+}
+
 .main {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
     max-width: 1100px;
     margin: 0 auto;
-    padding: 12px 14px calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 24px);
+    padding: 12px 14px 28px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
 }
 
 .view[hidden] { display: none; }
@@ -265,8 +283,7 @@ code {
 /* ============ TABBAR (bottom nav) ============ */
 
 .tabbar {
-    position: fixed;
-    left: 0; right: 0; bottom: 0;
+    flex: 0 0 auto;
     z-index: 40;
     display: flex;
     background: rgba(15, 18, 24, .92);
@@ -650,7 +667,7 @@ code {
 
 .detail-bar {
     position: sticky;
-    top: calc(var(--topbar-h) + env(safe-area-inset-top));
+    top: -12px; /* cancels .main's top padding so it hugs the topbar */
     z-index: 30;
     display: flex;
     align-items: center;
@@ -911,7 +928,10 @@ code {
 @media (min-width: 900px) {
     :root { --tabbar-h: 0px; }
 
-    body { font-size: 14.5px; }
+    body { font-size: 14.5px; overflow: auto; }
+
+    /* Back to a normal window-scrolled page with a fixed left rail */
+    #app { display: block; height: auto; }
 
     .topbar-inner { max-width: none; padding-left: 248px; padding-right: 24px; }
     .topbar-user { display: inline; }
@@ -919,10 +939,13 @@ code {
     .main {
         max-width: none;
         padding: 20px 28px 60px 252px;
+        overflow-y: visible;
     }
 
     /* Bottom bar becomes a left rail */
     .tabbar {
+        position: fixed;
+        left: 0;
         top: 0;
         right: auto;
         bottom: 0;
@@ -992,5 +1015,5 @@ code {
 
     .toast { bottom: 28px; left: calc(50% + 112px); }
 
-    .detail-bar { margin: -20px -28px 16px; padding: 10px 28px; }
+    .detail-bar { margin: -20px -28px 16px; padding: 10px 28px; top: var(--topbar-h); }
 }
