@@ -27,6 +27,7 @@ import submitTrialCampaign from './api/submit-trial-campaign.js';
 import getTrialCampaigns from './api/get-trial-campaigns.js';
 import submitLeadOutreach from './api/submit-lead-outreach.js';
 import leadOutreachAdmin from './api/lead-outreach-admin.js';
+import crmAdmin from './api/crm-admin.js';
 
 // API routes
 app.post('/api/create-order', createOrder);
@@ -43,6 +44,11 @@ app.get('/api/lead-outreach-admin', leadOutreachAdmin);
 app.post('/api/lead-outreach-admin', leadOutreachAdmin);
 app.patch('/api/lead-outreach-admin', leadOutreachAdmin);
 app.delete('/api/lead-outreach-admin', leadOutreachAdmin);
+app.options('/api/crm-admin', crmAdmin);
+app.get('/api/crm-admin', crmAdmin);
+app.post('/api/crm-admin', crmAdmin);
+app.patch('/api/crm-admin', crmAdmin);
+app.delete('/api/crm-admin', crmAdmin);
 
 // Serve static files - ROUTES FIRST
 app.get('/', (req, res) => {
@@ -83,6 +89,10 @@ app.get('/index.html', (req, res) => {
 
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+app.get('/crm', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'crm.html'));
 });
 
 app.get('/success', (req, res) => {

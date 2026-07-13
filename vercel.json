@@ -46,6 +46,10 @@
       "destination": "/admin.html"
     },
     {
+      "source": "/crm",
+      "destination": "/crm.html"
+    },
+    {
       "source": "/success",
       "destination": "/success.html"
     }

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0F1013">
+    <title>Client OS</title>
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('crm-theme') || 'dark';
+                var d = localStorage.getItem('crm-density') || 'default';
+                document.documentElement.setAttribute('data-theme', t);
+                document.documentElement.setAttribute('data-density', d);
+            } catch (e) {}
+        })();
+    </script>
+    <link rel="stylesheet" href="/css/crm.css">
+</head>
+<body>
+    <!-- Login gate -->
+    <div id="authScreen" class="auth-screen">
+        <form id="loginForm" class="auth-card">
+            <p class="eyebrow">Internal access</p>
+            <h1>Client OS</h1>
+            <label for="adminEmail">Email</label>
+            <input type="email" id="adminEmail" autocomplete="email" required>
+            <label for="adminPassword">Password</label>
+            <input type="password" id="adminPassword" autocomplete="current-password" required>
+            <button type="submit" id="loginBtn" class="primary-btn">Sign in</button>
+            <p id="loginError" class="form-message error"></p>
+        </form>
+    </div>
+
+    <!-- App -->
+    <div id="appShell" class="app-shell" hidden>
+        <header class="app-header">
+            <h1>Clients</h1>
+            <span class="count" id="countLabel">0 clients</span>
+            <span class="spacer"></span>
+            <button id="logoutBtn" class="header-logout" type="button">Sign out</button>
+        </header>
+
+        <div class="chip-row" id="chipRow"></div>
+
+        <div class="client-list" id="clientList"></div>
+
+        <div class="bottom-bar">
+            <button class="search-pill" id="searchBtn" type="button">
+                <svg width="13" height="13" viewBox="0 0 14 14"><circle cx="6" cy="6" r="4.6" stroke="currentColor" stroke-width="1.5" fill="none" class="icon-t3"></circle><path d="M9.6 9.6L13 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="icon-t3"></path></svg>
+                <span>Search clients</span>
+            </button>
+            <button class="bar-btn" id="sortBtn" type="button" aria-label="Sort and display">
+                <svg width="15" height="13" viewBox="0 0 16 14"><path d="M1 3h14M3.5 7h9M6 11h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="icon-t2"></path></svg>
+            </button>
+            <button class="bar-btn solid" id="addBtn" type="button" aria-label="Add client">
+                <svg width="13" height="13" viewBox="0 0 14 14"><path d="M7 1.5v11M1.5 7h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" class="icon-btntext"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Overlays (rendered/toggled by JS) -->
+    <div id="overlayRoot"></div>
+
+    <div id="busyOverlay" class="busy" hidden>Loading…</div>
+
+    <script type="module" src="/js/crm.js"></script>
+</body>
+</html>
