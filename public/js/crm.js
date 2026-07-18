@@ -300,9 +300,10 @@ class ClientOS {
 
     /* ----------------------------------------------------------- render -- */
     render() {
-        this.renderCount();
+        const rows = this.visibleClients();   // filter+sort once, share with count + list
+        this.renderCount(rows);
         this.renderChips();
-        this.renderList();
+        this.renderList(rows);
     }
 
     visibleClients() {
@@ -336,10 +337,9 @@ class ClientOS {
         return [...list].sort(cmp);
     }
 
-    renderCount() {
+    renderCount(rows = this.visibleClients()) {
         const total = this.state.clients.filter((c) => !c.archived).length;
-        const shown = this.visibleClients().length;
-        this.dom.count.textContent = this.state.filters.length ? `${shown} of ${total}` : `${total} clients`;
+        this.dom.count.textContent = this.state.filters.length ? `${rows.length} of ${total}` : `${total} clients`;
     }
 
     renderChips() {
@@ -405,10 +405,9 @@ class ClientOS {
         ] : [l1, l2])]);
     }
 
-    renderList() {
+    renderList(rows = this.visibleClients()) {
         const list = this.dom.list;
         list.textContent = '';
-        const rows = this.visibleClients();
         if (rows.length === 0) {
             list.appendChild(h('div', { class: 'empty' }, [
                 h('div', { class: 'title', text: this.state.clients.some((c) => !c.archived) ? 'No clients match' : 'No clients yet' }),
@@ -501,7 +500,7 @@ class ClientOS {
             h('span', { html: icon }), h('span', { text: label })
         ]);
         body.appendChild(h('div', { class: 'qa-grid' }, [
-            qa(ICONS.dm, 'Open DM', 'primary', () => { window.open('https://instagram.com/m/' + encodeURIComponent(c.handle), '_blank', 'noopener'); this.toast('Opening @' + c.handle); }),
+            qa(ICONS.dm, 'Open DM', 'primary', () => { window.open('https://ig.me/m/' + encodeURIComponent(c.handle), '_blank', 'noopener'); this.toast('Opening @' + c.handle); }),
             qa(ICONS.check, 'Contacted', null, () => this.patch(c.id, { lastContactedAt: Date.now(), needsReply: false, history: this.withHistory(c, 'Marked contacted') }, { toast: 'Marked contacted' })),
             qa(ICONS.bell, 'Remind', null, () => this.openReminder()),
             qa(ICONS.pencil, 'Edit', null, () => this.openForm(c.id)),
@@ -633,6 +632,7 @@ class ClientOS {
     openSheet2Sort() {}
     buildSort(body) {
         const s = this.state;
+        body.textContent = '';   // rebuilt in place on theme/density toggle — clear first
         body.appendChild(h('div', { class: 'field-label', style: 'padding:6px 0 4px', text: 'Sort by' }));
         for (const [id, label] of SORTS) {
             body.appendChild(h('div', {
@@ -737,9 +737,13 @@ class ClientOS {
         try {
             this.closeOverlay();
             this.dom.busy.hidden = false;
-            await this.apiRequest('POST', { data: { handle, niche: vals.niche, status: vals.status, note: vals.note, followUpAt } });
+            const { firebaseKey } = await this.apiRequest('POST', { data: { handle, niche: vals.niche, status: vals.status, note: vals.note, followUpAt } });
+            // A brand-new client isn't "actionable" yet, so the default Today filter
+            // would hide it. Drop to All and open it so it's never lost after adding.
+            this.state.filters = [];
             await this.load();
             this.toast('@' + handle + ' added');
+            if (firebaseKey) this.openDetail(firebaseKey);
         } catch (err) {
             this.toast(err.message || 'Could not add client');
         } finally {
