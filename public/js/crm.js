@@ -500,7 +500,7 @@ class ClientOS {
             h('span', { html: icon }), h('span', { text: label })
         ]);
         body.appendChild(h('div', { class: 'qa-grid' }, [
-            qa(ICONS.dm, 'Open DM', 'primary', () => { window.open('https://ig.me/m/' + encodeURIComponent(c.handle), '_blank', 'noopener'); this.toast('Opening @' + c.handle); }),
+            qa(ICONS.dm, 'Open IG', 'primary', () => { window.open('https://instagram.com/' + encodeURIComponent(c.handle), '_blank', 'noopener'); this.toast('Opening @' + c.handle); }),
             qa(ICONS.check, 'Contacted', null, () => this.patch(c.id, { lastContactedAt: Date.now(), needsReply: false, history: this.withHistory(c, 'Marked contacted') }, { toast: 'Marked contacted' })),
             qa(ICONS.bell, 'Remind', null, () => this.openReminder()),
             qa(ICONS.pencil, 'Edit', null, () => this.openForm(c.id)),
