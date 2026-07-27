@@ -114,6 +114,9 @@ function normalizeUpdates(updates, user) {
     if (Object.prototype.hasOwnProperty.call(updates, 'followUpAt')) {
         normalized.followUpAt = updates.followUpAt == null ? null : (Number(updates.followUpAt) || null);
     }
+    if (Object.prototype.hasOwnProperty.call(updates, 'followUpHasTime')) {
+        normalized.followUpHasTime = !!updates.followUpHasTime;
+    }
     if (Object.prototype.hasOwnProperty.call(updates, 'lastContactedAt')) {
         normalized.lastContactedAt = updates.lastContactedAt == null ? null : (Number(updates.lastContactedAt) || null);
     }
@@ -161,6 +164,7 @@ async function handlePost(database, req, res, user) {
         note: sanitizeString(data.note, 2000),
         needsReply: !!data.needsReply,
         followUpAt: data.followUpAt == null ? null : (Number(data.followUpAt) || null),
+        followUpHasTime: !!data.followUpHasTime,
         lastContactedAt: now,
         highlights: sanitizeHighlights(data.highlights),
         history: [{ at: now, text: 'Added to clients' }],

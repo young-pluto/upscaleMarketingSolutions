@@ -86,6 +86,7 @@ function normalizeClient(c) {
         needsReply: !!c.needsReply,
         archived: !!c.archived,
         followUpAt: c.followUpAt || null,
+        followUpHasTime: !!c.followUpHasTime,
         lastContactedAt: c.lastContactedAt || null,
         highlights: toArray(c.highlights).map((x) => ({ text: x.text || '', pinned: !!x.pinned })).filter((x) => x.text),
         history: toArray(c.history).map((e) => ({ at: e.at || 0, text: e.text || '' })).filter((e) => e.text),
@@ -93,10 +94,49 @@ function normalizeClient(c) {
     };
 }
 
-function startOfToday() {
-    const d = new Date();
+function startOfDay(ms) {
+    const d = new Date(ms);
     d.setHours(0, 0, 0, 0);
     return d.getTime();
+}
+
+function startOfToday() {
+    return startOfDay(Date.now());
+}
+
+// <input type="date"> speaks local YYYY-MM-DD; <input type="time"> local HH:MM.
+// Convert both ways in LOCAL time so a date the user picks on the calendar means
+// that calendar day for them — never a UTC-shifted neighbour.
+function toDateInputValue(ms) {
+    const d = new Date(ms);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function toTimeInputValue(ms) {
+    const d = new Date(ms);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// Build a local ms timestamp from a date string (+ optional time). No time → midnight,
+// which keeps fuDays/isDueToday/isOverdue (they floor to the day) working unchanged.
+function fromDateTimeInputs(dateStr, timeStr) {
+    if (!dateStr) return null;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    let hh = 0;
+    let mm = 0;
+    if (timeStr) {
+        const [a, b] = timeStr.split(':').map(Number);
+        hh = a || 0;
+        mm = b || 0;
+    }
+    return new Date(y, (m || 1) - 1, d || 1, hh, mm, 0, 0).getTime();
+}
+
+function timeLabel(ms) {
+    return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
 function ago(ms) {
@@ -147,6 +187,88 @@ function statusPillStyle(status, big) {
 function dateLabel(ms) {
     const d = new Date(ms);
     return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/* Follow-up picker — shared by the Remind sheet and the add/edit form.
+   Quick presets for speed + a native calendar date input for any specific day,
+   plus an optional time (stored for a future push-notification reminder).
+   Returns { node, get } where get() → { at: ms|null, hasTime: bool }. */
+function fuPicker(initialAt, initialHasTime) {
+    const sel = { at: initialAt || null, hasTime: !!(initialAt && initialHasTime) };
+
+    const dateInput = h('input', { type: 'date', class: 'fu-input' });
+    const timeInput = h('input', { type: 'time', class: 'fu-input' });
+    const preview = h('div', { class: 'fu-preview' });
+
+    const presets = [[0, 'Today'], [1, 'Tomorrow'], [3, 'In 3 days'], [7, 'Next week'], [14, 'In 2 weeks']];
+    const chipEls = presets.map(([days, label]) => {
+        const ts = startOfToday() + days * DAY;
+        const el = h('button', { type: 'button', class: 'fu-chip' }, label);
+        el._ts = ts;
+        el.addEventListener('click', () => {
+            sel.at = ts;
+            sel.hasTime = false;
+            sync();
+        });
+        return el;
+    });
+
+    const markChips = () => chipEls.forEach((el) => {
+        const on = sel.at != null && !sel.hasTime && startOfDay(sel.at) === el._ts;
+        el.classList.toggle('on', on);
+    });
+
+    const renderPreview = () => {
+        preview.textContent = '';
+        if (!sel.at) {
+            preview.classList.add('none');
+            preview.appendChild(h('span', { text: 'No follow-up set' }));
+            return;
+        }
+        preview.classList.remove('none');
+        preview.appendChild(h('span', { class: 'fu-preview-rel', text: fuLabel(sel.at) }));
+        preview.appendChild(h('span', { class: 'fu-preview-abs', text: dateLabel(sel.at) + (sel.hasTime ? ' · ' + timeLabel(sel.at) : '') }));
+    };
+
+    const sync = () => {
+        dateInput.value = sel.at ? toDateInputValue(sel.at) : '';
+        timeInput.value = sel.at && sel.hasTime ? toTimeInputValue(sel.at) : '';
+        markChips();
+        renderPreview();
+    };
+
+    dateInput.addEventListener('change', () => {
+        if (!dateInput.value) { sel.at = null; sel.hasTime = false; sync(); return; }
+        sel.at = fromDateTimeInputs(dateInput.value, sel.hasTime ? timeInput.value : '');
+        renderPreview();
+        markChips();
+    });
+    timeInput.addEventListener('change', () => {
+        if (!timeInput.value) {
+            sel.hasTime = false;
+            if (sel.at) sel.at = startOfDay(sel.at);
+            sync();
+            return;
+        }
+        if (!dateInput.value) dateInput.value = toDateInputValue(startOfToday());
+        sel.at = fromDateTimeInputs(dateInput.value, timeInput.value);
+        sel.hasTime = true;
+        renderPreview();
+        markChips();
+    });
+
+    sync();
+
+    const node = h('div', { class: 'fu-picker' }, [
+        h('div', { class: 'pill-wrap' }, chipEls),
+        h('div', { class: 'fu-inputs' }, [
+            h('label', { class: 'fu-field' }, [h('span', { class: 'fu-field-label', text: 'Date' }), dateInput]),
+            h('label', { class: 'fu-field' }, [h('span', { class: 'fu-field-label', text: 'Time · optional' }), timeInput])
+        ]),
+        preview
+    ]);
+
+    return { node, get: () => ({ at: sel.at, hasTime: sel.hasTime }) };
 }
 
 /* ================================================================ app == */
@@ -510,9 +632,13 @@ class ClientOS {
         // follow-up row
         const n = fuDays(c.followUpAt);
         const fuColor = n != null && n < 0 ? 'var(--red)' : (n === 0 ? 'var(--orange)' : 'var(--t1)');
+        const fuValue = [h('span', { class: 'value', style: 'color:' + fuColor, text: fuLabel(c.followUpAt) })];
+        if (c.followUpAt) {
+            fuValue.push(h('span', { class: 'sub', text: dateLabel(c.followUpAt) + (c.followUpHasTime ? ' · ' + timeLabel(c.followUpAt) : '') }));
+        }
         body.appendChild(h('div', { class: 'followup-row', onclick: () => this.openReminder() }, [
             h('span', { class: 'label', text: 'Follow-up' }),
-            h('span', { class: 'value', style: 'color:' + fuColor, text: fuLabel(c.followUpAt) })
+            h('div', { class: 'fu-value-wrap' }, fuValue)
         ]));
 
         // highlights
@@ -603,27 +729,32 @@ class ClientOS {
     openReminder() {
         const c = this.findClient(this.state.detailId);
         if (!c) return;
+        const picker = fuPicker(c.followUpAt, c.followUpHasTime);
         this.openSheet('detail', (body) => {
             body.appendChild(h('div', { class: 'form-title', text: 'Follow up with @' + c.handle }));
-            const opts = [
-                [0, 'Today'], [1, 'Tomorrow'], [3, 'In 3 days'], [7, 'Next week']
-            ];
-            const container = h('div', {}, opts.map(([days, label]) => {
-                const ts = startOfToday() + days * DAY;
-                return h('div', {
-                    class: 'remind-row', onclick: () => {
-                        this.patch(c.id, { followUpAt: ts, history: this.withHistory(c, 'Follow-up set · ' + label.toLowerCase()) }, { toast: 'Follow-up · ' + label.toLowerCase() });
-                        this.openDetail(c.id);
-                    }
-                }, [h('span', { class: 'label', text: label }), h('span', { class: 'sub', text: dateLabel(ts) })]);
-            }));
-            container.appendChild(h('div', {
-                class: 'remind-row danger', onclick: () => {
-                    this.patch(c.id, { followUpAt: null }, { toast: 'Follow-up cleared' });
+            body.appendChild(picker.node);
+            body.appendChild(h('button', {
+                class: 'form-cta', style: 'margin-top:18px', onclick: () => {
+                    const { at, hasTime } = picker.get();
+                    const historyText = at
+                        ? 'Follow-up set · ' + dateLabel(at) + (hasTime ? ' ' + timeLabel(at) : '')
+                        : 'Follow-up cleared';
+                    this.patch(c.id, {
+                        followUpAt: at,
+                        followUpHasTime: !!at && hasTime,
+                        history: this.withHistory(c, historyText)
+                    }, { toast: at ? 'Follow-up · ' + fuLabel(at).toLowerCase() : 'Follow-up cleared' });
                     this.openDetail(c.id);
                 }
-            }, [h('span', { class: 'label', text: 'Clear follow-up' })]));
-            body.appendChild(container);
+            }, 'Save follow-up'));
+            if (c.followUpAt) {
+                body.appendChild(h('button', {
+                    class: 'remind-clear', onclick: () => {
+                        this.patch(c.id, { followUpAt: null, followUpHasTime: false, history: this.withHistory(c, 'Follow-up cleared') }, { toast: 'Follow-up cleared' });
+                        this.openDetail(c.id);
+                    }
+                }, 'Clear follow-up'));
+            }
         });
         this.state.sheet = 'detail';
     }
@@ -672,8 +803,8 @@ class ClientOS {
         const c = editing ? this.findClient(id) : null;
         this.state.editingId = id;
         this.state.form = c
-            ? { handle: '@' + c.handle, niche: c.niche, status: c.status, note: c.note, fu: fuDays(c.followUpAt) }
-            : { handle: '', niche: '', status: 'Lead', note: '', fu: null };
+            ? { handle: '@' + c.handle, niche: c.niche, status: c.status, note: c.note, fuAt: c.followUpAt, fuHasTime: c.followUpHasTime }
+            : { handle: '', niche: '', status: 'Lead', note: '', fuAt: null, fuHasTime: false };
 
         this.openSheet('form', (body) => {
             const f = this.state.form;
@@ -694,25 +825,17 @@ class ClientOS {
             };
             renderStatus();
 
-            const fuWrap = h('div', { class: 'pill-wrap' });
-            const fuOpts = [[null, 'None'], [0, 'Today'], [1, 'Tomorrow'], [3, 'In 3 days'], [7, 'Next week']];
-            const renderFu = () => {
-                fuWrap.textContent = '';
-                fuOpts.forEach(([v, label]) => fuWrap.appendChild(h('button', {
-                    class: 'fu-chip' + (f.fu === v ? ' on' : ''), onclick: () => { f.fu = v; renderFu(); }
-                }, label)));
-            };
-            renderFu();
+            const picker = fuPicker(f.fuAt, f.fuHasTime);
 
             body.appendChild(h('div', { class: 'form-fields' }, [
                 handleInput,
                 nicheInput,
                 h('div', {}, [h('div', { class: 'field-label', text: 'Status' }), statusWrap]),
-                h('div', {}, [h('div', { class: 'field-label', text: 'Follow-up' }), fuWrap]),
+                h('div', {}, [h('div', { class: 'field-label', text: 'Follow-up' }), picker.node]),
                 noteInput,
                 h('button', {
                     class: 'form-cta', onclick: () => this.saveForm({
-                        handle: handleInput.value, niche: nicheInput.value, note: noteInput.value, status: f.status, fu: f.fu
+                        handle: handleInput.value, niche: nicheInput.value, note: noteInput.value, status: f.status, fu: picker.get()
                     })
                 }, editing ? 'Save changes' : 'Add client')
             ]));
@@ -722,12 +845,14 @@ class ClientOS {
     async saveForm(vals) {
         const handle = (vals.handle || '').replace(/^@/, '').trim();
         if (!handle) { this.toast('Handle is required'); return; }
-        const followUpAt = vals.fu == null ? null : startOfToday() + vals.fu * DAY;
+        const fu = vals.fu || { at: null, hasTime: false };
+        const followUpAt = fu.at || null;
+        const followUpHasTime = !!followUpAt && !!fu.hasTime;
 
         if (this.state.editingId) {
             const c = this.findClient(this.state.editingId);
             this.patch(c.id, {
-                handle, handleKey: handle.toLowerCase(), niche: vals.niche, status: vals.status, note: vals.note, followUpAt
+                handle, handleKey: handle.toLowerCase(), niche: vals.niche, status: vals.status, note: vals.note, followUpAt, followUpHasTime
             }, { toast: 'Saved' });
             this.openDetail(c.id);
             return;
@@ -737,7 +862,7 @@ class ClientOS {
         try {
             this.closeOverlay();
             this.dom.busy.hidden = false;
-            const { firebaseKey } = await this.apiRequest('POST', { data: { handle, niche: vals.niche, status: vals.status, note: vals.note, followUpAt } });
+            const { firebaseKey } = await this.apiRequest('POST', { data: { handle, niche: vals.niche, status: vals.status, note: vals.note, followUpAt, followUpHasTime } });
             // A brand-new client isn't "actionable" yet, so the default Today filter
             // would hide it. Drop to All and open it so it's never lost after adding.
             this.state.filters = [];
