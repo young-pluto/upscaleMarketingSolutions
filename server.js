@@ -28,6 +28,7 @@ import getTrialCampaigns from './api/get-trial-campaigns.js';
 import submitLeadOutreach from './api/submit-lead-outreach.js';
 import leadOutreachAdmin from './api/lead-outreach-admin.js';
 import crmAdmin from './api/crm-admin.js';
+import trialAdmin from './api/trial-admin.js';
 
 // API routes
 app.post('/api/create-order', createOrder);
@@ -49,6 +50,9 @@ app.get('/api/crm-admin', crmAdmin);
 app.post('/api/crm-admin', crmAdmin);
 app.patch('/api/crm-admin', crmAdmin);
 app.delete('/api/crm-admin', crmAdmin);
+app.options('/api/trial-admin', trialAdmin);
+app.patch('/api/trial-admin', trialAdmin);
+app.delete('/api/trial-admin', trialAdmin);
 
 // Serve static files - ROUTES FIRST
 app.get('/', (req, res) => {

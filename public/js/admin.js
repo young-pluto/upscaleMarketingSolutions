@@ -365,7 +365,9 @@ function cycleActivity(collection, key) {
             .then(() => loadClientsFromApi())
             .catch((err) => { console.error(err); toast('Save failed', 'error'); });
     } else {
-        fbUpdate(`${collection}/${key}`, { activity: next, updatedAt: Date.now() });
+        trialApi('PATCH', { firebaseKey: key, updates: { activity: next } })
+            .then(() => loadTrialsFromApi())
+            .catch((err) => { console.error(err); toast('Save failed', 'error'); });
     }
     toast(`Marked ${ACTIVITY_LABEL[next]}`, 'success');
 }
@@ -563,11 +565,11 @@ async function loadTrialsFromApi() {
 // SDK — so (like the CRM) the admin reads AND writes them through the token-authed
 // /api/crm-admin endpoint (Admin SDK server-side). This also keeps the handle/
 // email/phone indexes maintained, which direct writes would skip.
-async function crmApi(method, body) {
+async function authedApi(url, method, body) {
     const user = auth.currentUser;
     if (!user) throw new Error('Not signed in');
     const token = await user.getIdToken();
-    const res = await fetch('/api/crm-admin', {
+    const res = await fetch(url, {
         method,
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: body ? JSON.stringify(body) : undefined,
@@ -576,6 +578,8 @@ async function crmApi(method, body) {
     if (!res.ok) throw new Error(data.message || data.error || 'Request failed');
     return data;
 }
+const crmApi = (method, body) => authedApi('/api/crm-admin', method, body);
+const trialApi = (method, body) => authedApi('/api/trial-admin', method, body);
 
 async function loadClientsFromApi() {
     try {
@@ -1368,7 +1372,7 @@ function openLeadSheet(firebaseKey) {
     }));
     const getAct = bindActivitySeg('tAct', activityOf(l));
 
-    $('tSave').addEventListener('click', () => {
+    $('tSave').addEventListener('click', async () => {
         const sv = $('tStart').value, evv = $('tEnd').value;
         const viewsStart = sv === '' ? null : Number(sv);
         const viewsEnd = evv === '' ? null : Number(evv);
@@ -1380,21 +1384,31 @@ function openLeadSheet(firebaseKey) {
         if (viewsRecorded && commentsGiven && likesGiven && finalStatus === 'new') finalStatus = 'completed';
 
         closeSheet();
-        fbUpdate(`trialCampaignSubmissions/${firebaseKey}`, {
-            leadStatus: finalStatus,
-            activity: getAct(),
-            viewsStart, viewsEnd, commentsGiven, likesGiven,
-            instagramLink: $('tIg').value.trim() || null,
-            adminNotes: $('tNotes').value,
-            updatedAt: Date.now(),
-        }, 'Lead saved');
+        try {
+            await trialApi('PATCH', {
+                firebaseKey,
+                updates: {
+                    leadStatus: finalStatus,
+                    activity: getAct(),
+                    viewsStart, viewsEnd, commentsGiven, likesGiven,
+                    instagramLink: $('tIg').value.trim() || null,
+                    adminNotes: $('tNotes').value,
+                }
+            });
+            toast('Lead saved', 'success');
+            await loadTrialsFromApi();
+        } catch (err) { console.error(err); toast(err.message || 'Save failed', 'error'); }
     });
 
     $('tDelete').addEventListener('click', () => {
         openConfirm('Delete trial lead?', `<p>Remove <strong>${escapeHtml(l.fullName || 'this lead')}</strong>? This can't be undone.</p>`, async () => {
             closeConfirm();
             closeSheet();
-            await fbRemove(`trialCampaignSubmissions/${firebaseKey}`, 'Lead deleted');
+            try {
+                await trialApi('DELETE', { firebaseKey });
+                toast('Lead deleted', 'success');
+                await loadTrialsFromApi();
+            } catch (err) { console.error(err); toast(err.message || 'Delete failed', 'error'); }
         });
     });
 }
