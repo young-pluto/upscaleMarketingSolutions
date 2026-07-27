@@ -360,7 +360,13 @@ function cycleActivity(collection, key) {
     const rec = list.find((x) => x.firebaseKey === key);
     if (!rec) return;
     const next = nextActivity(activityOf(rec));
-    fbUpdate(`${collection}/${key}`, { activity: next, updatedAt: Date.now() });
+    if (collection === 'crm/clients') {
+        crmApi('PATCH', { firebaseKey: key, updates: { activity: next } })
+            .then(() => loadClientsFromApi())
+            .catch((err) => { console.error(err); toast('Save failed', 'error'); });
+    } else {
+        fbUpdate(`${collection}/${key}`, { activity: next, updatedAt: Date.now() });
+    }
     toast(`Marked ${ACTIVITY_LABEL[next]}`, 'success');
 }
 
@@ -482,8 +488,9 @@ function subscribeAll() {
     unsubscribeAll();
 
     sub('orders', (rows) => { S.orders = rows; S.loaded.orders = true; }, 'orders', loadOrdersFromApi);
-    // One unified client source of truth, shared with the CRM.
-    sub('crm/clients', (rows) => { S.clients = rows.map(normClient); S.loaded.clients = true; }, 'clients');
+    // One unified client source of truth, shared with the CRM. Loaded via the
+    // token-authed API (crm/* isn't exposed to the client SDK by RTDB rules).
+    loadClientsFromApi();
     sub('trialCampaignSubmissions', (rows) => { S.trials = rows; S.loaded.trials = true; }, 'leads', loadTrialsFromApi);
     sub('channels', (rows) => {
         rows.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
@@ -549,6 +556,36 @@ async function loadTrialsFromApi() {
     } catch (e) {
         console.error(e);
         toast('Failed to load trial leads', 'error');
+    }
+}
+
+// Clients live under crm/* which RTDB security rules don't expose to the client
+// SDK — so (like the CRM) the admin reads AND writes them through the token-authed
+// /api/crm-admin endpoint (Admin SDK server-side). This also keeps the handle/
+// email/phone indexes maintained, which direct writes would skip.
+async function crmApi(method, body) {
+    const user = auth.currentUser;
+    if (!user) throw new Error('Not signed in');
+    const token = await user.getIdToken();
+    const res = await fetch('/api/crm-admin', {
+        method,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || data.error || 'Request failed');
+    return data;
+}
+
+async function loadClientsFromApi() {
+    try {
+        const { clients } = await crmApi('GET');
+        S.clients = (clients || []).map(normClient);
+        S.loaded.clients = true;
+        rerender('clients');
+    } catch (e) {
+        console.error(e);
+        toast('Failed to load clients', 'error');
     }
 }
 
@@ -921,25 +958,15 @@ async function createClient(name) {
     if (!trimmed) return null;
     const slug = await uniqueSlug(toSlug(trimmed), null);
     try {
-        const newRef = push(ref(database, 'crm/clients'));
-        const now = Date.now();
-        const data = {
-            handle: '', handleKey: '', name: trimmed, slug,
-            email: '', emailKey: '', phone: '', phoneKey: '',
-            niche: '', channel: '',
-            status: 'Client', activity: 'neutral', urgent: false, needsReply: false,
-            note: '', highlights: [], history: [{ at: now, text: 'Added from admin' }],
-            followUpAt: null, followUpHasTime: false, lastContactedAt: now,
-            source: 'manual', archived: false,
-            createdAt: now, updatedAt: now,
-            createdBy: S.user?.email || 'admin', updatedBy: S.user?.email || 'admin',
-        };
-        await set(newRef, data);
+        const { firebaseKey } = await crmApi('POST', {
+            data: { name: trimmed, slug, status: 'Client', source: 'manual' }
+        });
+        await loadClientsFromApi();
         // return admin-shape so the order picker can label it
-        return { firebaseKey: newRef.key, name: trimmed, slug };
+        return { firebaseKey, name: trimmed, slug };
     } catch (err) {
         console.error(err);
-        toast('Failed to create client', 'error');
+        toast(err.message || 'Failed to create client', 'error');
         return null;
     }
 }
@@ -1015,25 +1042,19 @@ function openNewClientSheet() {
         if (slug) slug = await uniqueSlug(slug, null);
         closeSheet();
         try {
-            const now = Date.now();
-            const newRef = push(ref(database, 'crm/clients'));
-            await set(newRef, {
-                handle, handleKey: handle.toLowerCase(),
-                name, slug,
-                email, emailKey: email.toLowerCase(),
-                phone: $('ncPhone').value.trim(), phoneKey: $('ncPhone').value.replace(/[^\d+]/g, ''),
-                niche: '',
-                channel: $('ncChannel').value || '',
-                status: getStatus(), activity: getAct(), urgent: false, needsReply: false,
-                note: $('ncNotes').value,
-                highlights: [], history: [{ at: now, text: 'Added from admin' }],
-                followUpAt: null, followUpHasTime: false, lastContactedAt: now,
-                source: 'manual', archived: false,
-                createdAt: now, updatedAt: now,
-                createdBy: S.user?.email || 'admin', updatedBy: S.user?.email || 'admin',
+            await crmApi('POST', {
+                data: {
+                    handle, name, slug,
+                    email, phone: $('ncPhone').value.trim(),
+                    channel: $('ncChannel').value || '',
+                    status: getStatus(), activity: getAct(),
+                    note: $('ncNotes').value,
+                    source: 'manual',
+                }
             });
+            await loadClientsFromApi();
             toast('Client added', 'success');
-        } catch (err) { console.error(err); toast('Save failed', 'error'); }
+        } catch (err) { console.error(err); toast(err.message || 'Save failed', 'error'); }
     });
 }
 
@@ -1143,24 +1164,27 @@ async function saveClientDetail() {
     const act = document.querySelector('#cdAct .seg.active')?.dataset.value || activityOf(c);
     const followUpAt = msFromDateInput($('cdFollow').value);
 
-    const ok = await fbUpdate(`crm/clients/${c.firebaseKey}`, {
-        name, slug,
-        handle, handleKey: handle.toLowerCase(),
-        email, emailKey: email.toLowerCase(),
-        phone: $('cdPhone').value.trim(), phoneKey: $('cdPhone').value.replace(/[^\d+]/g, ''),
-        channel: $('cdChannel').value || '',
-        status, activity: act,
-        urgent: $('cdHot').checked,
-        note: $('cdNotes').value,
-        followUpAt,
-        followUpHasTime: followUpAt ? c.followUpHasTime : false,
-        lastContactedAt: msFromDateInput($('cdContact').value) || c.lastContactedAt || null,
-        updatedAt: Date.now(),
-        updatedBy: S.user?.email || 'admin',
-    }, 'Client saved');
-    if (!ok) return;
+    try {
+        await crmApi('PATCH', {
+            firebaseKey: c.firebaseKey,
+            updates: {
+                name, slug, handle, email,
+                phone: $('cdPhone').value.trim(),
+                channel: $('cdChannel').value || '',
+                status, activity: act,
+                urgent: $('cdHot').checked,
+                note: $('cdNotes').value,
+                followUpAt,
+                followUpHasTime: followUpAt ? c.followUpHasTime : false,
+                lastContactedAt: msFromDateInput($('cdContact').value) || c.lastContactedAt || null,
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        return toast(err.message || 'Save failed', 'error');
+    }
 
-    // Keep the denormalized name/slug on orders in sync
+    // Keep the denormalized name/slug on orders in sync (orders/ is client-SDK writable)
     if (name !== c.name || slug !== c.slug) {
         const updates = {};
         S.orders.forEach((o) => {
@@ -1172,6 +1196,8 @@ async function saveClientDetail() {
         if (Object.keys(updates).length) await update(ref(database), updates).catch(console.error);
     }
     S.dirty = false;
+    toast('Client saved', 'success');
+    await loadClientsFromApi();
     renderClientDetail();
 }
 
@@ -1183,21 +1209,24 @@ function deleteClientFromDetail() {
         ? `<p>Their <strong>${stats.orderCount}</strong> order${stats.orderCount === 1 ? '' : 's'} will be kept, just unassigned.</p>` : '';
     openConfirm('Delete client?', `<p>Remove <strong>${escapeHtml(c.name || c.handle || 'this client')}</strong>?</p>${note}`, async () => {
         closeConfirm();
-        const updates = {};
-        S.orders.forEach((o) => {
-            if (o.clientId === c.firebaseKey) {
-                updates[`orders/${o.firebaseKey}/clientId`] = null;
-                updates[`orders/${o.firebaseKey}/clientName`] = null;
-                updates[`orders/${o.firebaseKey}/clientSlug`] = null;
-            }
-        });
-        updates[`crm/clients/${c.firebaseKey}`] = null;
         S.dirty = false;
         try {
-            await update(ref(database), updates);
+            // Unassign the client's orders (orders/ is client-SDK writable)...
+            const updates = {};
+            S.orders.forEach((o) => {
+                if (o.clientId === c.firebaseKey) {
+                    updates[`orders/${o.firebaseKey}/clientId`] = null;
+                    updates[`orders/${o.firebaseKey}/clientName`] = null;
+                    updates[`orders/${o.firebaseKey}/clientSlug`] = null;
+                }
+            });
+            if (Object.keys(updates).length) await update(ref(database), updates);
+            // ...then delete the client via the API.
+            await crmApi('DELETE', { firebaseKey: c.firebaseKey });
             toast('Client deleted', 'success');
+            await loadClientsFromApi();
             navigate('clients');
-        } catch (err) { console.error(err); toast('Delete failed', 'error'); }
+        } catch (err) { console.error(err); toast(err.message || 'Delete failed', 'error'); }
     });
 }
 
@@ -1447,13 +1476,17 @@ function openChannelSheet(channel) {
             openConfirm('Delete channel?', `<p>Remove <strong>${escapeHtml(channel.name)}</strong>?</p>${note}`, async () => {
                 closeConfirm();
                 closeSheet();
-                const updates = {};
-                S.clients.forEach((c) => { if (c.channel === channel.firebaseKey) updates[`crm/clients/${c.firebaseKey}/channel`] = null; });
-                updates[`channels/${channel.firebaseKey}`] = null;
                 try {
-                    await update(ref(database), updates);
+                    // Unlink each client from this channel via the API (crm/* isn't
+                    // client-SDK writable), then remove the channel node directly.
+                    const affected = S.clients.filter((c) => c.channel === channel.firebaseKey);
+                    for (const c of affected) {
+                        await crmApi('PATCH', { firebaseKey: c.firebaseKey, updates: { channel: '' } });
+                    }
+                    await remove(ref(database, `channels/${channel.firebaseKey}`));
+                    if (affected.length) await loadClientsFromApi();
                     toast('Channel deleted', 'success');
-                } catch (err) { console.error(err); toast('Delete failed', 'error'); }
+                } catch (err) { console.error(err); toast(err.message || 'Delete failed', 'error'); }
             });
         });
     }
