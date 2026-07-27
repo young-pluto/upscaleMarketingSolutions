@@ -245,53 +245,6 @@
                 </div>
             </section>
 
-            <!-- ============ OLD CLIENTS ============ -->
-            <section id="view-old" class="view" hidden>
-                <div class="toolbar">
-                    <label class="search">
-                        <svg><use href="#i-search"/></svg>
-                        <input type="search" id="oldSearch" placeholder="Search old clients" autocomplete="off">
-                    </label>
-                    <button id="oldAdd" class="btn btn-primary"><svg><use href="#i-plus"/></svg>Add</button>
-                </div>
-
-                <div class="chip-row" id="oldTabs" role="tablist"></div>
-
-                <div class="list-head">
-                    <span class="count" id="oldCount"></span>
-                    <label class="sort">
-                        Channel
-                        <select id="oldChannel"><option value="">All</option></select>
-                    </label>
-                    <label class="sort">
-                        Sort
-                        <select id="oldSort">
-                            <option value="oldest">Oldest contact</option>
-                            <option value="newest">Newest contact</option>
-                            <option value="name">Name A–Z</option>
-                        </select>
-                    </label>
-                </div>
-
-                <div id="oldList" class="list" aria-live="polite"></div>
-                <div id="oldEmpty" class="empty" hidden>
-                    <svg><use href="#i-history"/></svg>
-                    <h3>No old clients</h3>
-                    <p>Add one with the button above.</p>
-                </div>
-            </section>
-
-            <!-- ============ OLD CLIENT DETAIL ============ -->
-            <section id="view-old-detail" class="view view-detail" hidden>
-                <div class="detail-bar">
-                    <button id="odBack" class="ibtn" aria-label="Back to old clients"><svg><use href="#i-back"/></svg></button>
-                    <h2 id="odTitle">Old client</h2>
-                    <button id="odDelete" class="ibtn ibtn-danger" title="Delete" aria-label="Delete"><svg><use href="#i-trash"/></svg></button>
-                    <button id="odSave" class="btn btn-primary">Save</button>
-                </div>
-                <div id="odBody" class="detail-body"></div>
-            </section>
-
             <!-- ============ CHANNELS ============ -->
             <section id="view-channels" class="view" hidden>
                 <div class="toolbar">
@@ -325,9 +278,6 @@
             </button>
             <button class="tab" data-nav="leads" aria-label="Trial leads">
                 <svg><use href="#i-target"/></svg><span>Leads</span><em class="tab-badge" id="badgeLeads" hidden></em>
-            </button>
-            <button class="tab" data-nav="old" aria-label="Old clients">
-                <svg><use href="#i-history"/></svg><span>Old</span>
             </button>
             <button class="tab" data-nav="channels" aria-label="Channels">
                 <svg><use href="#i-radio"/></svg><span>Channels</span>

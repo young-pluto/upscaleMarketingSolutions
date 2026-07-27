@@ -1,5 +1,54 @@
 import { admin, getDatabase } from './_firebase-admin.js';
 
+function idxKey(s) { return Buffer.from(String(s).toLowerCase(), 'utf8').toString('base64url'); }
+function normEmail(v) { return String(v || '').trim().toLowerCase(); }
+function normPhone(v) { return String(v || '').replace(/[^\d+]/g, '').trim(); }
+
+// Find an existing unified client by email/phone, or create one, so every paid
+// order lands on a client record automatically. Returns { clientKey, name } or null.
+async function findOrCreateClient(database, { email, phone, fullName }) {
+    const emailKey = normEmail(email);
+    const phoneKey = normPhone(phone);
+    if (!emailKey && !phoneKey) return null;
+
+    // Look up contact indexes first.
+    for (const [key, path] of [[emailKey, 'clientEmailIndex'], [phoneKey, 'clientPhoneIndex']]) {
+        if (!key) continue;
+        const snap = await database.ref(`crm/${path}/${idxKey(key)}`).once('value');
+        const clientKey = snap.val()?.clientKey;
+        if (clientKey) {
+            const c = await database.ref(`crm/clients/${clientKey}`).once('value');
+            if (c.exists()) return { clientKey, name: c.val().name || fullName || '' };
+        }
+    }
+
+    // Create a new "from order" client.
+    const now = Date.now();
+    const ref = database.ref('crm/clients').push();
+    await ref.set({
+        handle: '', handleKey: '',
+        name: String(fullName || email || 'Customer').slice(0, 160),
+        slug: '',
+        email: String(email || ''), emailKey,
+        phone: String(phone || ''), phoneKey,
+        niche: '', channel: '',
+        status: 'Client', activity: 'active',
+        needsReply: false, urgent: false,
+        note: '',
+        highlights: [], history: [{ at: now, text: 'Created from order' }],
+        followUpAt: null, followUpHasTime: false,
+        lastContactedAt: now,
+        source: 'order',
+        archived: false,
+        createdAt: admin.database.ServerValue.TIMESTAMP,
+        updatedAt: admin.database.ServerValue.TIMESTAMP,
+        createdBy: 'checkout', updatedBy: 'checkout'
+    });
+    if (emailKey) await database.ref(`crm/clientEmailIndex/${idxKey(emailKey)}`).transaction((cur) => (cur && cur.clientKey ? undefined : { clientKey: ref.key }));
+    if (phoneKey) await database.ref(`crm/clientPhoneIndex/${idxKey(phoneKey)}`).transaction((cur) => (cur && cur.clientKey ? undefined : { clientKey: ref.key }));
+    return { clientKey: ref.key, name: fullName || email || 'Customer' };
+}
+
 export default async function handler(req, res) {
     // Initialize Firebase if needed
     const database = getDatabase();
@@ -76,6 +125,21 @@ export default async function handler(req, res) {
             notes: '',
             adminNotes: ''
         };
+
+        // Auto-link this order to a unified client (find-or-create by email/phone),
+        // so the client book and their order history stay current with no manual step.
+        try {
+            const client = await findOrCreateClient(database, { email, phone, fullName });
+            if (client) {
+                orderData.clientId = client.clientKey;
+                orderData.clientName = client.name || '';
+                orderData.clientSlug = '';
+            }
+        } catch (linkErr) {
+            // Never fail an order write because linking hiccuped — the migration/admin
+            // can link it later. Log and continue.
+            console.error('Order client-link failed (order still saved):', linkErr.message);
+        }
 
         // Store in Firebase Realtime Database
         const ordersRef = database.ref('orders');

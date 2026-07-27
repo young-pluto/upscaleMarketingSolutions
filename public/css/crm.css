@@ -230,6 +230,36 @@ body {
 .row-l2 { display: flex; align-items: center; gap: 4px; overflow: hidden; }
 .row-more { font-size: 10.5px; color: var(--t3); flex-shrink: 0; }
 
+/* per-row "open their Instagram" button */
+.row-ig {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    background: var(--elev);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    color: var(--t1);
+    -webkit-tap-highlight-color: transparent;
+}
+.row-ig:active { background: var(--elev2); }
+
+/* channel badge — which of your pages the client came in through */
+.chan-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    padding: 2px 7px 2px 6px;
+    border-radius: 6px;
+    font-size: 10.5px;
+    font-weight: 560;
+}
+.chan-dot { width: 5px; height: 5px; border-radius: 3px; flex-shrink: 0; }
+
 /* pills */
 .pill {
     display: inline-flex;

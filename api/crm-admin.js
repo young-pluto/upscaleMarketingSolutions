@@ -34,6 +34,17 @@ function handleIndexKey(handleKey) {
     return Buffer.from(String(handleKey).toLowerCase(), 'utf8').toString('base64url');
 }
 
+function normalizeEmail(value) {
+    return sanitizeString(value, 200).toLowerCase();
+}
+
+function normalizePhone(value) {
+    return sanitizeString(value, 40).replace(/[^\d+]/g, '');
+}
+
+const ACTIVITIES = ['active', 'neutral', 'dormant'];
+const SOURCES = ['manual', 'crm', 'legacy', 'usm', 'order', 'lead-outreach'];
+
 function clampStatus(value) {
     return STATUSES.includes(value) ? value : 'Lead';
 }
@@ -99,6 +110,34 @@ function normalizeUpdates(updates, user) {
     if (Object.prototype.hasOwnProperty.call(updates, 'niche')) {
         normalized.niche = sanitizeString(updates.niche, 120);
     }
+    if (Object.prototype.hasOwnProperty.call(updates, 'channel')) {
+        normalized.channel = sanitizeString(updates.channel, 120);
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'name')) {
+        normalized.name = sanitizeString(updates.name, 160);
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'slug')) {
+        normalized.slug = sanitizeString(updates.slug, 160).toLowerCase();
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'email')) {
+        const email = sanitizeString(updates.email, 200);
+        normalized.email = email;
+        normalized.emailKey = normalizeEmail(email);
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'phone')) {
+        const phone = sanitizeString(updates.phone, 40);
+        normalized.phone = phone;
+        normalized.phoneKey = normalizePhone(phone);
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'activity')) {
+        normalized.activity = ACTIVITIES.includes(updates.activity) ? updates.activity : 'neutral';
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'urgent')) {
+        normalized.urgent = !!updates.urgent;
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'source')) {
+        normalized.source = SOURCES.includes(updates.source) ? updates.source : 'manual';
+    }
     if (Object.prototype.hasOwnProperty.call(updates, 'status')) {
         normalized.status = clampStatus(updates.status);
     }
@@ -132,35 +171,74 @@ function normalizeUpdates(updates, user) {
     return normalized;
 }
 
+// Orders before this are test data (mirrors admin.js TEST_ORDER_CUTOFF_MS).
+const TEST_ORDER_CUTOFF_MS = Date.parse('2025-09-06T00:00:00Z');
+
 async function handleGet(database, res) {
-    const snapshot = await database
-        .ref(COLLECTIONS.clients)
-        .orderByChild('createdAt')
-        .limitToLast(2000)
-        .once('value');
+    const [clientsSnap, channelsSnap, ordersSnap] = await Promise.all([
+        database.ref(COLLECTIONS.clients).orderByChild('createdAt').limitToLast(2000).once('value'),
+        database.ref('channels').once('value'),
+        database.ref('orders').once('value')
+    ]);
+
+    // Compact per-client order summary so the CRM can show "N orders · $X · last"
+    // without loading the whole orders node. Real (non-test) orders only.
+    const summary = {};
+    if (ordersSnap.exists()) {
+        ordersSnap.forEach((child) => {
+            const o = child.val() || {};
+            if (!o.clientId) return;
+            const ts = Number(o.createdAt) || (o.timestamp ? Date.parse(o.timestamp) : 0) || 0;
+            if (ts && ts < TEST_ORDER_CUTOFF_MS) return;
+            const s = summary[o.clientId] || (summary[o.clientId] = { count: 0, revenue: 0, lastOrderAt: 0 });
+            s.count += 1;
+            s.revenue += Number(o.amount) || 0;
+            if (ts > s.lastOrderAt) s.lastOrderAt = ts;
+        });
+    }
+
+    const clients = snapshotToArray(clientsSnap).map((c) => ({
+        ...c,
+        orderSummary: summary[c.firebaseKey] || { count: 0, revenue: 0, lastOrderAt: 0 }
+    }));
 
     return res.status(200).json({
         success: true,
-        clients: snapshotToArray(snapshot)
+        clients,
+        channels: snapshotToArray(channelsSnap)
     });
 }
 
 async function handlePost(database, req, res, user) {
     const data = req.body.data || {};
     const handle = normalizeHandle(data.handle);
-    if (!handle) {
-        return res.status(400).json({ error: 'Instagram handle is required' });
+    const name = sanitizeString(data.name, 160);
+    const email = sanitizeString(data.email, 200);
+    // A client must be identifiable by at least one of: handle, name, email.
+    if (!handle && !name && !email) {
+        return res.status(400).json({ error: 'A handle, name, or email is required' });
     }
 
     const handleKey = handle.toLowerCase();
-    const indexKey = handleIndexKey(handleKey);
+    const emailKey = normalizeEmail(email);
+    const phone = sanitizeString(data.phone, 40);
+    const phoneKey = normalizePhone(phone);
 
     const now = Date.now();
     const record = {
         handle,
         handleKey,
+        name,
+        slug: sanitizeString(data.slug, 160).toLowerCase(),
+        email,
+        emailKey,
+        phone,
+        phoneKey,
         niche: sanitizeString(data.niche, 120),
+        channel: sanitizeString(data.channel, 120),
         status: clampStatus(data.status),
+        activity: ACTIVITIES.includes(data.activity) ? data.activity : 'neutral',
+        urgent: !!data.urgent,
         note: sanitizeString(data.note, 2000),
         needsReply: !!data.needsReply,
         followUpAt: data.followUpAt == null ? null : (Number(data.followUpAt) || null),
@@ -168,6 +246,7 @@ async function handlePost(database, req, res, user) {
         lastContactedAt: now,
         highlights: sanitizeHighlights(data.highlights),
         history: [{ at: now, text: 'Added to clients' }],
+        source: SOURCES.includes(data.source) ? data.source : 'manual',
         archived: false,
         createdAt: admin.database.ServerValue.TIMESTAMP,
         updatedAt: admin.database.ServerValue.TIMESTAMP,
@@ -176,24 +255,37 @@ async function handlePost(database, req, res, user) {
     };
 
     const newRef = database.ref(COLLECTIONS.clients).push();
-    const indexRef = database.ref(`crm/clientHandleIndex/${indexKey}`);
 
-    // A read-then-write check can create duplicates when two add requests arrive
-    // together. Claim the handle index transactionally before writing the client.
-    const claim = await indexRef.transaction((current) => {
-        if (current && current.clientKey) return;
-        return { clientKey: newRef.key, handleKey };
-    });
-    if (!claim.committed) {
-        return res.status(409).json({ error: 'A client with that handle already exists', clientKey: claim.snapshot.val()?.clientKey });
+    // Only handles are uniqueness-guarded (transactional claim, mirrors the old
+    // behaviour). A read-then-write check can create duplicates when two adds race.
+    if (handleKey) {
+        const indexRef = database.ref(`crm/clientHandleIndex/${handleIndexKey(handleKey)}`);
+        const claim = await indexRef.transaction((current) => {
+            if (current && current.clientKey) return;
+            return { clientKey: newRef.key, handleKey };
+        });
+        if (!claim.committed) {
+            return res.status(409).json({ error: 'A client with that handle already exists', clientKey: claim.snapshot.val()?.clientKey });
+        }
+        try {
+            await newRef.set(record);
+        } catch (error) {
+            await indexRef.transaction((current) => (current?.clientKey === newRef.key ? null : current));
+            throw error;
+        }
+    } else {
+        await newRef.set(record);
     }
 
-    try {
-        await newRef.set(record);
-    } catch (error) {
-        // Do not leave a claimed handle behind if the client write fails.
-        await indexRef.transaction((current) => (current?.clientKey === newRef.key ? null : current));
-        throw error;
+    // Best-effort contact indexes (used for order auto-linking; handle stays the
+    // hard uniqueness key). Only claim if not already pointing elsewhere.
+    if (emailKey) {
+        await database.ref(`crm/clientEmailIndex/${handleIndexKey(emailKey)}`)
+            .transaction((cur) => (cur && cur.clientKey ? undefined : { clientKey: newRef.key }));
+    }
+    if (phoneKey) {
+        await database.ref(`crm/clientPhoneIndex/${handleIndexKey(phoneKey)}`)
+            .transaction((cur) => (cur && cur.clientKey ? undefined : { clientKey: newRef.key }));
     }
 
     return res.status(200).json({ success: true, firebaseKey: newRef.key });

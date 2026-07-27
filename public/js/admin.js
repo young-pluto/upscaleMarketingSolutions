@@ -31,6 +31,18 @@ const TRIAL_STATUSES = ['new', 'completed', 'contacted', 'converted', 'archived'
 const TRIALED_STATUSES = ['completed', 'contacted', 'converted'];
 const ACTIVITIES = ['active', 'neutral', 'dormant'];
 const ACTIVITY_LABEL = { active: 'Active', neutral: 'Neutral', dormant: 'Dormant' };
+// Shared with the CRM. `status` is the relationship temperature; the unified
+// client record lives in crm/clients and both apps read/write it.
+const CRM_STATUSES = ['Lead', 'Warm', 'Active', 'Client', 'VIP', 'Stale', 'Dead'];
+// Segments for the one unified Clients list (see renderClients).
+const CLIENT_SEGMENTS = [
+    { key: 'all', label: 'All' },
+    { key: 'hasOrders', label: 'Has orders' },
+    { key: 'order', label: 'From order' },
+    { key: 'legacy', label: 'Old' },
+    { key: 'active', label: 'Active', cls: 'chip-active-cat' },
+    { key: 'urgent', label: 'Hot', cls: 'chip-hot-cat', icon: 'flame' },
+];
 const PAGE_SIZE = 20;
 const DAY_MS = 86_400_000;
 
@@ -283,6 +295,39 @@ function channelName(id) {
     return c ? c.name : '';
 }
 
+// Adapt a unified crm/clients record to the shape the admin renders. The admin
+// historically used `instagram`/`notes`; the unified store uses `handle`/`note`.
+function normClient(r) {
+    const handle = r.handle || '';
+    return {
+        firebaseKey: r.firebaseKey,
+        name: r.name || '',
+        slug: r.slug || '',
+        handle,
+        instagram: r.instagram || handle,          // avatar / IG helpers accept a bare handle
+        email: r.email || '',
+        phone: r.phone || '',
+        channel: r.channel || '',
+        activity: ACTIVITIES.includes(r.activity) ? r.activity : 'neutral',
+        status: CRM_STATUSES.includes(r.status) ? r.status : 'Lead',
+        urgent: !!r.urgent,
+        notes: r.note || '',                         // shared notes (unified field is `note`)
+        followUpAt: r.followUpAt || null,
+        followUpHasTime: !!r.followUpHasTime,
+        lastContactedAt: r.lastContactedAt || null,
+        source: r.source || 'manual',
+        createdAt: r.createdAt || 0,
+        updatedAt: r.updatedAt || 0,
+    };
+}
+
+function statusPillStyle(status) {
+    const v = `var(--st-${CRM_STATUSES.includes(status) ? status : 'Lead'})`;
+    return `color:${v};background:color-mix(in srgb, ${v} 15%, transparent)`;
+}
+
+const SOURCE_LABEL = { order: 'From order', legacy: 'Old', usm: 'Client', crm: 'CRM', 'lead-outreach': 'Lead', manual: '' };
+
 function clientStats(client) {
     const orders = S.orders.filter((o) => o.clientId === client.firebaseKey && !isTestOrder(o));
     const totalSpent = orders.reduce((s, o) => s + Number(o.amount || 0), 0);
@@ -311,7 +356,7 @@ function fbRemove(path, okMsg) {
 }
 
 function cycleActivity(collection, key) {
-    const list = collection === 'usmClients' ? S.clients : collection === 'legacyClients' ? S.legacy : S.trials;
+    const list = collection === 'crm/clients' ? S.clients : S.trials;
     const rec = list.find((x) => x.firebaseKey === key);
     if (!rec) return;
     const next = nextActivity(activityOf(rec));
@@ -325,17 +370,17 @@ const VIEWS = {
     orders: { el: 'view-orders', title: 'Orders', render: renderOrders },
     clients: { el: 'view-clients', title: 'Clients', render: renderClients },
     leads: { el: 'view-leads', title: 'Trial Leads', render: renderLeads },
-    old: { el: 'view-old', title: 'Old Clients', render: renderOld },
     channels: { el: 'view-channels', title: 'Channels', render: renderChannels },
     'client-detail': { el: 'view-client-detail', title: 'Client', render: renderClientDetail },
-    'old-detail': { el: 'view-old-detail', title: 'Old Client', render: renderOldDetail },
 };
 
 function parseHash() {
     const h = (location.hash || '').replace(/^#\/?/, '');
     const [seg, id] = h.split('/');
     if (seg === 'client' && id) return { view: 'client-detail', id };
-    if (seg === 'old' && id) return { view: 'old-detail', id };
+    // Legacy deep links (#/old, #/old/:id) fold into the unified clients list.
+    if (seg === 'old' && id) return { view: 'client-detail', id };
+    if (seg === 'old') return { view: 'clients', id: null };
     if (VIEWS[seg]) return { view: seg, id: null };
     return { view: 'orders', id: null };
 }
@@ -437,8 +482,8 @@ function subscribeAll() {
     unsubscribeAll();
 
     sub('orders', (rows) => { S.orders = rows; S.loaded.orders = true; }, 'orders', loadOrdersFromApi);
-    sub('usmClients', (rows) => { S.clients = rows; S.loaded.clients = true; }, 'clients');
-    sub('legacyClients', (rows) => { S.legacy = rows; S.loaded.legacy = true; }, 'old');
+    // One unified client source of truth, shared with the CRM.
+    sub('crm/clients', (rows) => { S.clients = rows.map(normClient); S.loaded.clients = true; }, 'clients');
     sub('trialCampaignSubmissions', (rows) => { S.trials = rows; S.loaded.trials = true; }, 'leads', loadTrialsFromApi);
     sub('channels', (rows) => {
         rows.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
@@ -468,9 +513,8 @@ function rerender(collection) {
     const map = {
         orders: ['orders', 'clients', 'client-detail'],           // client stats derive from orders
         clients: ['clients', 'client-detail', 'orders', 'channels'],
-        old: ['old', 'old-detail', 'channels'],
         leads: ['leads'],
-        channels: ['channels', 'clients', 'old', 'client-detail', 'old-detail'],
+        channels: ['channels', 'clients', 'client-detail'],
     };
     const affected = map[collection] || [];
     if (affected.includes(S.route.view)) {
@@ -736,11 +780,11 @@ function openOrderSheet(firebaseKey) {
     const drawResults = (q) => {
         const term = (q || '').toLowerCase().trim();
         const matches = S.clients
-            .filter((c) => !term || c.name.toLowerCase().includes(term) || (c.slug || '').includes(term))
+            .filter((c) => !term || c.name.toLowerCase().includes(term) || c.handle.toLowerCase().includes(term) || c.email.toLowerCase().includes(term) || (c.slug || '').includes(term))
             .slice(0, 6);
         $('fClientResults').innerHTML =
             (term ? `<button type="button" class="picker-row picker-row-new" data-new>${icon('plus')} Create “${escapeHtml(q)}”</button>` : '')
-            + matches.map((c) => `<button type="button" class="picker-row" data-cid="${escAttr(c.firebaseKey)}"><strong>${escapeHtml(c.name)}</strong><small>/${escapeHtml(c.slug || '')}</small></button>`).join('');
+            + matches.map((c) => `<button type="button" class="picker-row" data-cid="${escAttr(c.firebaseKey)}"><strong>${escapeHtml(c.name || (c.handle ? '@' + c.handle : c.email))}</strong><small>${c.handle ? '@' + escapeHtml(c.handle) : escapeHtml(c.email || '')}</small></button>`).join('');
         $('fClientResults').querySelectorAll('[data-cid]').forEach((row) => row.addEventListener('click', () => {
             const c = S.clients.find((x) => x.firebaseKey === row.dataset.cid);
             if (!c) return;
@@ -801,16 +845,35 @@ function openOrderSheet(firebaseKey) {
 
 /* ============ CLIENTS VIEW ============ */
 
+function matchesSegment(c, seg) {
+    switch (seg) {
+        case 'hasOrders': return clientStats(c).orderCount > 0;
+        case 'order': return c.source === 'order';
+        case 'legacy': return c.source === 'legacy';
+        case 'active': return activityOf(c) === 'active';
+        case 'urgent': return !!c.urgent;
+        default: return true;
+    }
+}
+
 function renderClients() {
     const ui = S.ui.clients;
-    chipRow($('clientsTabs'), activityChips(activityCounts(S.clients), S.clients.length), ui.tab, (k) => {
+    const segChips = CLIENT_SEGMENTS.map((s) => ({
+        ...s,
+        count: s.key === 'all' ? S.clients.length : S.clients.filter((c) => matchesSegment(c, s.key)).length,
+    }));
+    chipRow($('clientsTabs'), segChips, ui.tab, (k) => {
         ui.tab = k; persistUi(); renderClients();
     });
 
-    let items = S.clients.slice();
-    if (ui.tab !== 'all') items = items.filter((c) => activityOf(c) === ui.tab);
+    let items = S.clients.filter((c) => matchesSegment(c, ui.tab));
     const q = ui.search;
-    if (q) items = items.filter((c) => c.name.toLowerCase().includes(q) || (c.slug || '').includes(q));
+    if (q) items = items.filter((c) =>
+        c.name.toLowerCase().includes(q)
+        || c.handle.toLowerCase().includes(q)
+        || c.email.toLowerCase().includes(q)
+        || (c.slug || '').includes(q)
+        || c.notes.toLowerCase().includes(q));
 
     const enriched = items.map((c) => ({ ...c, _s: clientStats(c) }));
     enriched.sort((a, b) => {
@@ -830,26 +893,24 @@ function clientCardHtml(c) {
     const key = escAttr(c.firebaseKey);
     const ig = instagramUrl(c.instagram);
     const chan = channelName(c.channel);
+    const src = SOURCE_LABEL[c.source] || '';
+    const title = c.name || (c.handle ? '@' + c.handle : (c.email || 'Client'));
     return `
-    <article class="card tappable" data-key="${key}" data-kind="client" role="button" tabindex="0" aria-label="Open ${escAttr(c.name)}">
+    <article class="card tappable" data-key="${key}" data-kind="client" role="button" tabindex="0" aria-label="Open ${escAttr(title)}">
         <div class="card-row">
-            ${avatarHtml(c.name, c.instagram)}
+            ${avatarHtml(title, c.instagram)}
             <div class="card-main">
-                <div class="card-title">${escapeHtml(c.name)}</div>
+                <div class="card-title">${c.urgent ? icon('flame', 'flame') : ''}${escapeHtml(title)}</div>
                 <div class="card-sub">
-                    ${actPillHtml(c, 'data-stop')}
-                    <span>${c._s.orderCount} order${c._s.orderCount === 1 ? '' : 's'}</span>
-                    <span class="sep">·</span>
-                    <span class="money">${money(c._s.totalSpent)}</span>
-                    <span class="sep">·</span>
-                    <span class="muted">${c._s.lastOrderTs ? escapeHtml(relTime(c._s.lastOrderTs)) : 'no orders'}</span>
+                    <span class="pill" style="${statusPillStyle(c.status)}">${escapeHtml(c.status)}</span>
+                    ${c._s.orderCount ? `<span>${c._s.orderCount} order${c._s.orderCount === 1 ? '' : 's'}</span><span class="sep">·</span><span class="money">${money(c._s.totalSpent)}</span>` : (src ? `<span class="muted">${escapeHtml(src)}</span>` : '')}
                     ${chan ? `<span class="pill pill-chan">${escapeHtml(chan)}</span>` : ''}
                 </div>
                 ${c.notes ? `<div class="card-note">${icon('note')}<span>${escapeHtml(truncate(c.notes, 90))}</span></div>` : ''}
             </div>
             <div class="card-actions">
                 ${ig ? `<a class="ibtn ibtn-ig" href="${ig}" target="_blank" rel="noopener noreferrer" title="Open Instagram ${escAttr(instagramDisplay(c.instagram))}" aria-label="Open Instagram" data-stop>${icon('instagram')}</a>` : ''}
-                <button class="ibtn" data-action="orders" data-stop title="See this client's orders" aria-label="See orders">${icon('folder')}</button>
+                ${c._s.orderCount ? `<button class="ibtn" data-action="orders" data-stop title="See this client's orders" aria-label="See orders">${icon('folder')}</button>` : ''}
             </div>
         </div>
     </article>`;
@@ -860,10 +921,22 @@ async function createClient(name) {
     if (!trimmed) return null;
     const slug = await uniqueSlug(toSlug(trimmed), null);
     try {
-        const newRef = push(ref(database, 'usmClients'));
-        const data = { name: trimmed, slug, notes: '', activity: 'neutral', createdAt: Date.now(), updatedAt: Date.now() };
+        const newRef = push(ref(database, 'crm/clients'));
+        const now = Date.now();
+        const data = {
+            handle: '', handleKey: '', name: trimmed, slug,
+            email: '', emailKey: '', phone: '', phoneKey: '',
+            niche: '', channel: '',
+            status: 'Client', activity: 'neutral', urgent: false, needsReply: false,
+            note: '', highlights: [], history: [{ at: now, text: 'Added from admin' }],
+            followUpAt: null, followUpHasTime: false, lastContactedAt: now,
+            source: 'manual', archived: false,
+            createdAt: now, updatedAt: now,
+            createdBy: S.user?.email || 'admin', updatedBy: S.user?.email || 'admin',
+        };
         await set(newRef, data);
-        return { firebaseKey: newRef.key, ...data };
+        // return admin-shape so the order picker can label it
+        return { firebaseKey: newRef.key, name: trimmed, slug };
     } catch (err) {
         console.error(err);
         toast('Failed to create client', 'error');
@@ -880,15 +953,35 @@ async function uniqueSlug(base, excludeId) {
     return `${base}-${Date.now()}`;
 }
 
+function statusSegHtml(current, id) {
+    return `<div class="segmented" id="${id}" style="flex-wrap:wrap">
+        ${CRM_STATUSES.map((s) => `<button type="button" class="seg ${s === current ? 'active' : ''}" data-value="${s}">${s}</button>`).join('')}
+    </div>`;
+}
+function bindSeg(id, initial, onChange) {
+    let value = initial;
+    document.querySelectorAll(`#${id} .seg`).forEach((b) => b.addEventListener('click', () => {
+        value = b.dataset.value;
+        document.querySelectorAll(`#${id} .seg`).forEach((x) => x.classList.toggle('active', x === b));
+        if (onChange) onChange(value);
+    }));
+    return () => value;
+}
+
 function openNewClientSheet() {
     const body = `
     <div class="form">
         <label class="field"><span>Name</span><input type="text" id="ncName" placeholder="e.g. Big Sumo" autocomplete="off"></label>
+        <label class="field"><span>Instagram handle</span><input type="text" id="ncIg" placeholder="@username or full URL" autocomplete="off"></label>
+        <div class="form-2col">
+            <label class="field"><span>Email</span><input type="email" id="ncEmail" placeholder="optional" autocomplete="off"></label>
+            <label class="field"><span>Phone</span><input type="tel" id="ncPhone" placeholder="optional" autocomplete="off"></label>
+        </div>
+        <div class="field"><span>Status</span>${statusSegHtml('Lead', 'ncStatus')}</div>
+        <label class="field"><span>Channel / page</span><select id="ncChannel">${channelOptions('')}</select></label>
         <label class="field"><span>Public slug</span><input type="text" id="ncSlug" placeholder="auto-generated" autocomplete="off">
-            <small>Their public page: <code>campaigns.upscalemarketingsolutions.com/c/<span id="ncSlugPrev">slug</span></code></small>
+            <small>Public page: <code>campaigns.upscalemarketingsolutions.com/c/<span id="ncSlugPrev">slug</span></code></small>
         </label>
-        <label class="field"><span>Instagram</span><input type="text" id="ncIg" placeholder="@username or full URL" autocomplete="off"></label>
-        <label class="field"><span>Channel</span><select id="ncChannel">${channelOptions('')}</select></label>
         <div class="field"><span>Category</span>${activitySegHtml('neutral', 'ncAct')}</div>
         <label class="field"><span>Notes</span><textarea id="ncNotes" rows="3"></textarea></label>
     </div>`;
@@ -911,23 +1004,33 @@ function openNewClientSheet() {
         $('ncSlugPrev').textContent = $('ncSlug').value || 'slug';
     });
     const getAct = bindActivitySeg('ncAct', 'neutral');
+    const getStatus = bindSeg('ncStatus', 'Lead');
 
     $('ncSave').addEventListener('click', async () => {
         const name = $('ncName').value.trim();
-        if (!name) return toast('Name is required', 'error');
+        const handle = igHandle($('ncIg').value);
+        const email = $('ncEmail').value.trim();
+        if (!name && !handle && !email) return toast('Add a name, handle, or email', 'error');
         let slug = toSlug($('ncSlug').value || name);
-        if (!slug) return toast('Slug is required', 'error');
-        slug = await uniqueSlug(slug, null);
+        if (slug) slug = await uniqueSlug(slug, null);
         closeSheet();
         try {
-            const newRef = push(ref(database, 'usmClients'));
+            const now = Date.now();
+            const newRef = push(ref(database, 'crm/clients'));
             await set(newRef, {
+                handle, handleKey: handle.toLowerCase(),
                 name, slug,
-                instagram: $('ncIg').value.trim() || null,
-                channel: $('ncChannel').value || null,
-                activity: getAct(),
-                notes: $('ncNotes').value,
-                createdAt: Date.now(), updatedAt: Date.now(),
+                email, emailKey: email.toLowerCase(),
+                phone: $('ncPhone').value.trim(), phoneKey: $('ncPhone').value.replace(/[^\d+]/g, ''),
+                niche: '',
+                channel: $('ncChannel').value || '',
+                status: getStatus(), activity: getAct(), urgent: false, needsReply: false,
+                note: $('ncNotes').value,
+                highlights: [], history: [{ at: now, text: 'Added from admin' }],
+                followUpAt: null, followUpHasTime: false, lastContactedAt: now,
+                source: 'manual', archived: false,
+                createdAt: now, updatedAt: now,
+                createdBy: S.user?.email || 'admin', updatedBy: S.user?.email || 'admin',
             });
             toast('Client added', 'success');
         } catch (err) { console.error(err); toast('Save failed', 'error'); }
@@ -943,9 +1046,11 @@ function renderClientDetail() {
         return;
     }
     S.dirty = false;
-    $('cdTitle').textContent = c.name || 'Client';
+    const title = c.name || (c.handle ? '@' + c.handle : (c.email || 'Client'));
+    $('cdTitle').textContent = title;
     const stats = clientStats(c);
     const ig = instagramUrl(c.instagram);
+    const src = SOURCE_LABEL[c.source] || '';
 
     const orderItems = S.orders
         .filter((o) => o.clientId === c.firebaseKey && !isTestOrder(o))
@@ -953,30 +1058,44 @@ function renderClientDetail() {
 
     $('cdBody').innerHTML = `
         <div class="profile-row">
-            ${avatarHtml(c.name, c.instagram)}
+            ${avatarHtml(title, c.instagram)}
             <div class="profile-row-main">
-                <div class="profile-row-name">${escapeHtml(c.name || 'Client')}</div>
-                <div class="profile-row-sub">${ig ? `<a href="${ig}" target="_blank" rel="noopener noreferrer">${escapeHtml(instagramDisplay(c.instagram))}</a>` : 'No Instagram linked'}</div>
+                <div class="profile-row-name">${c.urgent ? icon('flame', 'flame') : ''}${escapeHtml(title)}</div>
+                <div class="profile-row-sub">${ig ? `<a href="${ig}" target="_blank" rel="noopener noreferrer">${escapeHtml(instagramDisplay(c.instagram))}</a>` : 'No Instagram linked'}${src ? ` · <span class="muted">${escapeHtml(src)}</span>` : ''}</div>
             </div>
         </div>
         <div class="detail-stats">
             <div class="stat"><span class="stat-label">Orders</span><span class="stat-value">${stats.orderCount}</span></div>
             <div class="stat"><span class="stat-label">Spent</span><span class="stat-value">${money(stats.totalSpent)}</span></div>
             <div class="stat"><span class="stat-label">Views gained</span><span class="stat-value">+${stats.viewsGained.toLocaleString()}</span></div>
-            <div class="stat"><span class="stat-label">Last order</span><span class="stat-value">${stats.lastOrderTs ? relTime(stats.lastOrderTs) : '—'}</span></div>
+            <div class="stat"><span class="stat-label">Last contacted</span><span class="stat-value">${escapeHtml(contactAgo(c.lastContactedAt))}</span></div>
         </div>
         <div class="form">
+            <div class="field"><span>Status</span>${statusSegHtml(c.status, 'cdStatus')}</div>
             <div class="field"><span>Category</span>${activitySegHtml(activityOf(c), 'cdAct')}</div>
             <label class="field"><span>Name</span><input type="text" id="cdName" value="${escAttr(c.name || '')}"></label>
+            <label class="field"><span>Instagram handle</span><input type="text" id="cdIg" value="${escAttr(c.handle || '')}" placeholder="@username or full URL">
+                ${ig ? `<small><a href="${ig}" target="_blank" rel="noopener noreferrer">${escapeHtml(instagramDisplay(c.instagram))}</a></small>` : ''}
+            </label>
+            <div class="form-2col">
+                <label class="field"><span>Email</span><input type="email" id="cdEmail" value="${escAttr(c.email || '')}"></label>
+                <label class="field"><span>Phone</span><input type="tel" id="cdPhone" value="${escAttr(c.phone || '')}"></label>
+            </div>
+            <label class="field"><span>Channel / page</span><select id="cdChannel">${channelOptions(c.channel)}</select></label>
+            <div class="form-2col">
+                <label class="field"><span>Follow-up date</span><input type="date" id="cdFollow" value="${dateInputFromMs(c.followUpAt)}"></label>
+                <label class="field"><span>Last contacted</span>
+                    <div class="date-row"><input type="date" id="cdContact" value="${dateInputFromMs(c.lastContactedAt)}"><button type="button" class="btn btn-ghost" id="cdToday">Today</button></div>
+                </label>
+            </div>
             <label class="field"><span>Public slug</span><input type="text" id="cdSlug" value="${escAttr(c.slug || '')}">
                 <small>Public page: <code>campaigns.upscalemarketingsolutions.com/c/<span id="cdSlugPrev">${escapeHtml(c.slug || 'slug')}</span></code>
                 ${c.slug ? ` · <a href="https://campaigns.upscalemarketingsolutions.com/c/${encodeURIComponent(c.slug)}" target="_blank" rel="noopener noreferrer">open</a>` : ''}</small>
             </label>
-            <label class="field"><span>Instagram</span><input type="text" id="cdIg" value="${escAttr(c.instagram || '')}" placeholder="@username or full URL">
-                ${ig ? `<small><a href="${ig}" target="_blank" rel="noopener noreferrer">${escapeHtml(instagramDisplay(c.instagram))}</a></small>` : ''}
-            </label>
-            <label class="field"><span>Channel</span><select id="cdChannel">${channelOptions(c.channel)}</select></label>
-            <label class="field"><span>Notes</span><textarea id="cdNotes" rows="6">${escapeHtml(c.notes || '')}</textarea></label>
+            <div class="check-row">
+                <label class="check ${c.urgent ? 'checked' : ''}"><input type="checkbox" id="cdHot" ${c.urgent ? 'checked' : ''}><span class="check-box">${icon('check')}</span>Hot / urgent</label>
+            </div>
+            <label class="field"><span>Notes <span class="muted" style="font-weight:500">· shared with CRM</span></span><textarea id="cdNotes" rows="6">${escapeHtml(c.notes || '')}</textarea></label>
         </div>
         <div class="detail-section">
             <h3>Orders (${orderItems.length})</h3>
@@ -993,8 +1112,10 @@ function renderClientDetail() {
             </div>
         </div>`;
 
+    bindSeg('cdStatus', c.status, () => { S.dirty = true; });
     bindActivitySeg('cdAct', activityOf(c), () => { S.dirty = true; });
-    ['cdName', 'cdSlug', 'cdIg', 'cdChannel', 'cdNotes'].forEach((id) => {
+    $('cdToday').addEventListener('click', () => { $('cdContact').value = todayDateInput(); S.dirty = true; });
+    ['cdName', 'cdSlug', 'cdIg', 'cdEmail', 'cdPhone', 'cdChannel', 'cdNotes', 'cdFollow', 'cdContact', 'cdHot'].forEach((id) => {
         const el = $(id);
         el.addEventListener('input', () => { S.dirty = true; });
         el.addEventListener('change', () => { S.dirty = true; });
@@ -1011,21 +1132,31 @@ async function saveClientDetail() {
     const c = S.clients.find((x) => x.firebaseKey === S.route.id);
     if (!c) return;
     const name = $('cdName').value.trim();
-    if (!name) return toast('Name is required', 'error');
-    let slug = toSlug($('cdSlug').value || name);
-    if (!slug) return toast('Slug is required', 'error');
-    if (S.clients.some((x) => x.slug === slug && x.firebaseKey !== c.firebaseKey)) {
+    const handle = igHandle($('cdIg').value);
+    const email = $('cdEmail').value.trim();
+    if (!name && !handle && !email) return toast('Add a name, handle, or email', 'error');
+    let slug = toSlug($('cdSlug').value);
+    if (slug && S.clients.some((x) => x.slug === slug && x.firebaseKey !== c.firebaseKey)) {
         slug = await uniqueSlug(slug, c.firebaseKey);
     }
+    const status = document.querySelector('#cdStatus .seg.active')?.dataset.value || c.status;
     const act = document.querySelector('#cdAct .seg.active')?.dataset.value || activityOf(c);
+    const followUpAt = msFromDateInput($('cdFollow').value);
 
-    const ok = await fbUpdate(`usmClients/${c.firebaseKey}`, {
+    const ok = await fbUpdate(`crm/clients/${c.firebaseKey}`, {
         name, slug,
-        instagram: $('cdIg').value.trim() || null,
-        channel: $('cdChannel').value || null,
-        activity: act,
-        notes: $('cdNotes').value,
+        handle, handleKey: handle.toLowerCase(),
+        email, emailKey: email.toLowerCase(),
+        phone: $('cdPhone').value.trim(), phoneKey: $('cdPhone').value.replace(/[^\d+]/g, ''),
+        channel: $('cdChannel').value || '',
+        status, activity: act,
+        urgent: $('cdHot').checked,
+        note: $('cdNotes').value,
+        followUpAt,
+        followUpHasTime: followUpAt ? c.followUpHasTime : false,
+        lastContactedAt: msFromDateInput($('cdContact').value) || c.lastContactedAt || null,
         updatedAt: Date.now(),
+        updatedBy: S.user?.email || 'admin',
     }, 'Client saved');
     if (!ok) return;
 
@@ -1050,7 +1181,7 @@ function deleteClientFromDetail() {
     const stats = clientStats(c);
     const note = stats.orderCount
         ? `<p>Their <strong>${stats.orderCount}</strong> order${stats.orderCount === 1 ? '' : 's'} will be kept, just unassigned.</p>` : '';
-    openConfirm('Delete client?', `<p>Remove <strong>${escapeHtml(c.name)}</strong>?</p>${note}`, async () => {
+    openConfirm('Delete client?', `<p>Remove <strong>${escapeHtml(c.name || c.handle || 'this client')}</strong>?</p>${note}`, async () => {
         closeConfirm();
         const updates = {};
         S.orders.forEach((o) => {
@@ -1060,7 +1191,7 @@ function deleteClientFromDetail() {
                 updates[`orders/${o.firebaseKey}/clientSlug`] = null;
             }
         });
-        updates[`usmClients/${c.firebaseKey}`] = null;
+        updates[`crm/clients/${c.firebaseKey}`] = null;
         S.dirty = false;
         try {
             await update(ref(database), updates);
@@ -1239,205 +1370,11 @@ function openLeadSheet(firebaseKey) {
     });
 }
 
-/* ============ OLD CLIENTS VIEW ============ */
-
-function renderOld() {
-    const ui = S.ui.old;
-    const actCounts = activityCounts(S.legacy);
-    const hotCount = S.legacy.filter((l) => !!l.hot).length;
-
-    chipRow($('oldTabs'), [
-        { key: 'hot', label: 'Hot', count: hotCount, icon: 'flame', cls: 'chip-hot-cat' },
-        { key: 'active', label: 'Active', count: actCounts.active, cls: 'chip-active-cat' },
-        { key: 'neutral', label: 'Neutral', count: actCounts.neutral },
-        { key: 'dormant', label: 'Dormant', count: actCounts.dormant, cls: 'chip-dormant-cat' },
-        { key: 'all', label: 'All', count: S.legacy.length },
-    ], ui.tab, (k) => { ui.tab = k; persistUi(); renderOld(); });
-
-    let items = S.legacy.slice();
-    if (ui.tab === 'hot') items = items.filter((l) => !!l.hot);
-    else if (ui.tab !== 'all') items = items.filter((l) => activityOf(l) === ui.tab);
-    if (ui.channel) items = items.filter((l) => l.channel === ui.channel);
-    const q = ui.search;
-    if (q) {
-        items = items.filter((l) =>
-            String(l.name || '').toLowerCase().includes(q) ||
-            String(l.instagram || '').toLowerCase().includes(q) ||
-            channelName(l.channel).toLowerCase().includes(q));
-    }
-    items.sort((a, b) => {
-        switch (ui.sort) {
-            case 'newest': return (b.lastContacted || 0) - (a.lastContacted || 0);
-            case 'name': return String(a.name || '').localeCompare(String(b.name || ''));
-            default: return (a.lastContacted || 0) - (b.lastContacted || 0);
-        }
-    });
-
-    $('oldCount').textContent = countText(items.length, items.length);
-    listState($('oldList'), $('oldEmpty'), S.loaded.legacy, items.map(oldCardHtml).join(''));
-}
-
-function oldCardHtml(l) {
-    const key = escAttr(l.firebaseKey);
-    const d = daysSince(l.lastContacted);
-    const chan = channelName(l.channel);
-    const ig = instagramUrl(l.instagram);
-    return `
-    <article class="card tappable" data-key="${key}" data-kind="old" role="button" tabindex="0" aria-label="Open ${escAttr(l.name || '')}">
-        <div class="card-row">
-            ${avatarHtml(l.name, l.instagram)}
-            <div class="card-main">
-                <div class="card-title">${l.hot ? icon('flame', 'flame') : ''}${escapeHtml(l.name || 'No name')}</div>
-                <div class="card-sub">
-                    ${actPillHtml(l, 'data-stop')}
-                    <span class="${d > 60 && l.lastContacted ? 'overdue' : 'muted'}">contacted ${escapeHtml(contactAgo(l.lastContacted))}</span>
-                    ${chan ? `<span class="pill pill-chan">${escapeHtml(chan)}</span>` : ''}
-                    ${ig ? `<a href="${ig}" target="_blank" rel="noopener noreferrer" data-stop>${escapeHtml(instagramDisplay(l.instagram))}</a>` : ''}
-                </div>
-                ${l.notes ? `<div class="card-note">${icon('note')}<span>${escapeHtml(truncate(l.notes, 90))}</span></div>` : ''}
-            </div>
-            <div class="card-actions">
-                <button class="ibtn ${l.hot ? 'ibtn-danger' : ''}" data-action="hot" data-stop title="${l.hot ? 'Remove hot flag' : 'Flag as hot prospect'}" aria-label="Toggle hot">${icon('flame')}</button>
-                <button class="ibtn" data-action="touch" data-stop title="Mark contacted today" aria-label="Mark contacted today">${icon('cal-check')}</button>
-            </div>
-        </div>
-    </article>`;
-}
-
-function openNewOldSheet() {
-    const body = `
-    <div class="form">
-        <label class="field"><span>Name</span><input type="text" id="noName" placeholder="e.g. Lil Boss" autocomplete="off"></label>
-        <label class="field"><span>Instagram</span><input type="text" id="noIg" placeholder="@username or full URL" autocomplete="off"></label>
-        <label class="field"><span>Channel</span><select id="noChannel">${channelOptions('')}</select></label>
-        <label class="field"><span>Last contacted</span>
-            <div class="date-row">
-                <input type="date" id="noDate" value="${todayDateInput()}">
-                <button type="button" class="btn btn-ghost" id="noToday">Today</button>
-            </div>
-        </label>
-        <div class="field"><span>Category</span>${activitySegHtml('neutral', 'noAct')}</div>
-        <div class="check-row">
-            <label class="check"><input type="checkbox" id="noHot"><span class="check-box">${icon('check')}</span>Hot prospect</label>
-        </div>
-        <label class="field"><span>Notes</span><textarea id="noNotes" rows="3"></textarea></label>
-    </div>`;
-    const footer = `
-        <div class="footer-gap"></div>
-        <button class="btn btn-ghost" data-sheet-close>Cancel</button>
-        <button class="btn btn-primary" id="noSave">Add</button>`;
-    openSheet('Add old client', body, footer);
-
-    $('noToday').addEventListener('click', () => { $('noDate').value = todayDateInput(); });
-    const getAct = bindActivitySeg('noAct', 'neutral');
-
-    $('noSave').addEventListener('click', async () => {
-        const name = $('noName').value.trim();
-        if (!name) return toast('Name is required', 'error');
-        closeSheet();
-        try {
-            const r = push(ref(database, 'legacyClients'));
-            await set(r, {
-                name,
-                instagram: $('noIg').value.trim() || null,
-                channel: $('noChannel').value || null,
-                lastContacted: msFromDateInput($('noDate').value) || Date.now(),
-                hot: $('noHot').checked,
-                activity: getAct(),
-                notes: $('noNotes').value,
-                createdAt: Date.now(), updatedAt: Date.now(),
-            });
-            toast('Old client added', 'success');
-        } catch (err) { console.error(err); toast('Save failed', 'error'); }
-    });
-}
-
-/* ============ OLD CLIENT DETAIL ============ */
-
-function renderOldDetail() {
-    const l = S.legacy.find((x) => x.firebaseKey === S.route.id);
-    if (!l) {
-        if (S.loaded.legacy) navigate('old');
-        return;
-    }
-    S.dirty = false;
-    $('odTitle').textContent = l.name || 'Old client';
-    const d = daysSince(l.lastContacted);
-    const ig = instagramUrl(l.instagram);
-
-    $('odBody').innerHTML = `
-        <div class="profile-row">
-            ${avatarHtml(l.name, l.instagram)}
-            <div class="profile-row-main">
-                <div class="profile-row-name">${escapeHtml(l.name || 'Old client')}</div>
-                <div class="profile-row-sub">${ig ? `<a href="${ig}" target="_blank" rel="noopener noreferrer">${escapeHtml(instagramDisplay(l.instagram))}</a>` : 'No Instagram linked'}</div>
-            </div>
-        </div>
-        <div class="detail-stats">
-            <div class="stat"><span class="stat-label">Last contact</span><span class="stat-value ${d > 60 && l.lastContacted ? 'overdue' : ''}">${escapeHtml(contactAgo(l.lastContacted))}</span></div>
-            <div class="stat"><span class="stat-label">Flag</span><span class="stat-value">${l.hot ? '🔥 Hot' : '—'}</span></div>
-        </div>
-        <div class="form">
-            <div class="field"><span>Category</span>${activitySegHtml(activityOf(l), 'odAct')}</div>
-            <label class="field"><span>Name</span><input type="text" id="odName" value="${escAttr(l.name || '')}"></label>
-            <label class="field"><span>Instagram</span><input type="text" id="odIg" value="${escAttr(l.instagram || '')}" placeholder="@username or full URL">
-                ${ig ? `<small><a href="${ig}" target="_blank" rel="noopener noreferrer">${escapeHtml(instagramDisplay(l.instagram))}</a></small>` : ''}
-            </label>
-            <label class="field"><span>Channel</span><select id="odChannel">${channelOptions(l.channel)}</select></label>
-            <label class="field"><span>Last contacted</span>
-                <div class="date-row">
-                    <input type="date" id="odDate" value="${dateInputFromMs(l.lastContacted) || todayDateInput()}">
-                    <button type="button" class="btn btn-ghost" id="odToday">Today</button>
-                </div>
-            </label>
-            <div class="check-row">
-                <label class="check ${l.hot ? 'checked' : ''}"><input type="checkbox" id="odHot" ${l.hot ? 'checked' : ''}><span class="check-box">${icon('check')}</span>Hot prospect</label>
-            </div>
-            <label class="field"><span>Notes</span><textarea id="odNotes" rows="6">${escapeHtml(l.notes || '')}</textarea></label>
-        </div>`;
-
-    $('odToday').addEventListener('click', () => { $('odDate').value = todayDateInput(); S.dirty = true; });
-    bindActivitySeg('odAct', activityOf(l), () => { S.dirty = true; });
-    ['odName', 'odIg', 'odChannel', 'odDate', 'odHot', 'odNotes'].forEach((id) => {
-        const el = $(id);
-        el.addEventListener('input', () => { S.dirty = true; });
-        el.addEventListener('change', () => { S.dirty = true; });
-    });
-}
-
-async function saveOldDetail() {
-    const l = S.legacy.find((x) => x.firebaseKey === S.route.id);
-    if (!l) return;
-    const name = $('odName').value.trim();
-    if (!name) return toast('Name is required', 'error');
-    const act = document.querySelector('#odAct .seg.active')?.dataset.value || activityOf(l);
-    const ok = await fbUpdate(`legacyClients/${l.firebaseKey}`, {
-        name,
-        instagram: $('odIg').value.trim() || null,
-        channel: $('odChannel').value || null,
-        lastContacted: msFromDateInput($('odDate').value) || Date.now(),
-        hot: $('odHot').checked,
-        activity: act,
-        notes: $('odNotes').value,
-        updatedAt: Date.now(),
-    }, 'Saved');
-    if (ok) { S.dirty = false; renderOldDetail(); }
-}
-
-function deleteOldFromDetail() {
-    const l = S.legacy.find((x) => x.firebaseKey === S.route.id);
-    if (!l) return;
-    openConfirm('Delete old client?', `<p>Remove <strong>${escapeHtml(l.name || 'this entry')}</strong>? This can't be undone.</p>`, async () => {
-        closeConfirm();
-        S.dirty = false;
-        if (await fbRemove(`legacyClients/${l.firebaseKey}`, 'Deleted')) navigate('old');
-    });
-}
-
 /* ============ CHANNELS VIEW ============ */
 
 function refreshChannelFilter() {
     const sel = $('oldChannel');
+    if (!sel) return;   // old-clients channel filter was retired with the unified list
     const current = sel.value;
     sel.innerHTML = '<option value="">All</option>' + S.channels.map((c) =>
         `<option value="${escAttr(c.firebaseKey)}">${escapeHtml(c.name)}</option>`).join('');
@@ -1457,7 +1394,6 @@ function renderChannels() {
 
     listState($('chList'), $('chEmpty'), S.loaded.channels, items.map((c) => {
         const clients = S.clients.filter((x) => x.channel === c.firebaseKey).length;
-        const legacy = S.legacy.filter((x) => x.channel === c.firebaseKey).length;
         return `
         <article class="card tappable" data-key="${escAttr(c.firebaseKey)}" data-kind="channel" role="button" tabindex="0" aria-label="Edit ${escAttr(c.name)}">
             <div class="card-row">
@@ -1465,8 +1401,6 @@ function renderChannels() {
                     <div class="card-title">${escapeHtml(c.name)}</div>
                     <div class="card-sub">
                         <span>${clients} client${clients === 1 ? '' : 's'}</span>
-                        <span class="sep">·</span>
-                        <span>${legacy} old client${legacy === 1 ? '' : 's'}</span>
                     </div>
                 </div>
                 <div class="card-actions">
@@ -1508,15 +1442,13 @@ function openChannelSheet(channel) {
 
     if (isEdit) {
         $('chDelete').addEventListener('click', () => {
-            const linked = S.legacy.filter((l) => l.channel === channel.firebaseKey).length
-                + S.clients.filter((x) => x.channel === channel.firebaseKey).length;
-            const note = linked ? `<p>${linked} record${linked === 1 ? '' : 's'} reference this channel — they'll be unlinked, not deleted.</p>` : '';
+            const linked = S.clients.filter((x) => x.channel === channel.firebaseKey).length;
+            const note = linked ? `<p>${linked} client${linked === 1 ? '' : 's'} reference this channel — they'll be unlinked, not deleted.</p>` : '';
             openConfirm('Delete channel?', `<p>Remove <strong>${escapeHtml(channel.name)}</strong>?</p>${note}`, async () => {
                 closeConfirm();
                 closeSheet();
                 const updates = {};
-                S.legacy.forEach((l) => { if (l.channel === channel.firebaseKey) updates[`legacyClients/${l.firebaseKey}/channel`] = null; });
-                S.clients.forEach((c) => { if (c.channel === channel.firebaseKey) updates[`usmClients/${c.firebaseKey}/channel`] = null; });
+                S.clients.forEach((c) => { if (c.channel === channel.firebaseKey) updates[`crm/clients/${c.firebaseKey}/channel`] = null; });
                 updates[`channels/${channel.firebaseKey}`] = null;
                 try {
                     await update(ref(database), updates);
@@ -1685,11 +1617,10 @@ function wire() {
         const card = e.target.closest('.card');
         if (!card) return;
         const key = card.dataset.key;
-        if (e.target.closest('[data-cycle]')) return cycleActivity('usmClients', key);
         if (e.target.closest('[data-action="orders"]')) {
             const c = S.clients.find((x) => x.firebaseKey === key);
             if (!c) return;
-            S.ui.orders.clientFilter = { id: c.firebaseKey, name: c.name };
+            S.ui.orders.clientFilter = { id: c.firebaseKey, name: c.name || c.handle || 'client' };
             S.ui.orders.tab = 'pending';
             navigate('orders');
             return;
@@ -1726,39 +1657,6 @@ function wire() {
         openLeadSheet(card.dataset.key);
     });
 
-    // ---- Old clients ----
-    $('oldSearch').addEventListener('input', debounce((e) => {
-        S.ui.old.search = e.target.value.toLowerCase().trim();
-        renderOld();
-    }, 120));
-    $('oldSort').addEventListener('change', (e) => { S.ui.old.sort = e.target.value; persistUi(); renderOld(); });
-    $('oldChannel').addEventListener('change', (e) => { S.ui.old.channel = e.target.value; renderOld(); });
-    $('oldAdd').addEventListener('click', openNewOldSheet);
-
-    $('oldList').addEventListener('click', (e) => {
-        const card = e.target.closest('.card');
-        if (!card) return;
-        const key = card.dataset.key;
-        const l = S.legacy.find((x) => x.firebaseKey === key);
-        if (!l) return;
-        if (e.target.closest('[data-cycle]')) return cycleActivity('legacyClients', key);
-        if (e.target.closest('[data-action="hot"]')) {
-            fbUpdate(`legacyClients/${key}`, { hot: !l.hot, updatedAt: Date.now() });
-            toast(l.hot ? 'Hot flag removed' : 'Flagged hot 🔥', 'success');
-            return;
-        }
-        if (e.target.closest('[data-action="touch"]')) {
-            fbUpdate(`legacyClients/${key}`, { lastContacted: Date.now(), updatedAt: Date.now() }, 'Marked contacted today');
-            return;
-        }
-        if (e.target.closest('[data-stop]')) return;
-        navigate(`old/${key}`);
-    });
-
-    $('odBack').addEventListener('click', () => history.back());
-    $('odSave').addEventListener('click', saveOldDetail);
-    $('odDelete').addEventListener('click', deleteOldFromDetail);
-
     // ---- Channels ----
     $('chSearch').addEventListener('input', debounce((e) => {
         S.ui.channels.search = e.target.value.toLowerCase().trim();
@@ -1785,7 +1683,6 @@ function wire() {
     $('ordersSort').value = S.ui.orders.sort;
     $('clientsSort').value = S.ui.clients.sort;
     $('leadsSort').value = S.ui.leads.sort;
-    $('oldSort').value = S.ui.old.sort;
 }
 
 wire();

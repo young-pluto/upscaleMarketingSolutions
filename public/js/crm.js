@@ -17,6 +17,26 @@ const STATUSES = ['Lead', 'Warm', 'Active', 'Client', 'VIP', 'Stale', 'Dead'];
 const COLD_DAYS = 14;          // "haven't contacted in a while" threshold for Today
 const DAY = 86400000;
 
+// The Instagram pages you run — the shared `channels/` node, loaded from the API
+// and used by both the CRM and the admin. A client's `channel` field stores the
+// channel's key; we resolve it to { key, name, short, color } for display.
+let CHANNELS = [];
+let CHANNEL_MAP = {};
+const CHAN_PALETTE = ['#E5963C', '#31A8A0', '#A78BFA', '#5AB0F0', '#E56C8C', '#D0A94E'];
+const CHAN_KNOWN = { rapgoatsofficial: { short: 'Goats', color: '#E5963C' }, rapamplified: { short: 'Amplified', color: '#31A8A0' }, raplegends2k25: { short: 'Legends', color: '#A78BFA' } };
+function channelShort(name) {
+    const k = CHAN_KNOWN[String(name || '').toLowerCase()];
+    return k ? k.short : String(name || '');
+}
+function setChannels(list) {
+    CHANNELS = (list || []).map((c, i) => {
+        const known = CHAN_KNOWN[String(c.name || '').toLowerCase()];
+        return { key: c.firebaseKey, name: c.name || '', short: channelShort(c.name), color: known ? known.color : CHAN_PALETTE[i % CHAN_PALETTE.length] };
+    });
+    CHANNEL_MAP = Object.fromEntries(CHANNELS.map((c) => [c.key, c]));
+}
+function channelOf(key) { return (key && CHANNEL_MAP[key]) || null; }
+
 const SORTS = [
     ['priority', 'Priority'],
     ['longest', 'Longest since contact'],
@@ -46,7 +66,8 @@ const ICONS = {
     chevron: '<svg width="6" height="10" viewBox="0 0 6 10" class="chev"><path d="M1 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     caret: '<svg width="7" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>',
     tick: '<svg width="13" height="11" viewBox="0 0 14 12"><path d="M1.5 6.5l4 4 7-9" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    magnifier: '<svg width="13" height="13" viewBox="0 0 14 14"><circle cx="6" cy="6" r="4.6" stroke="currentColor" stroke-width="1.5" fill="none" class="icon-t3"/><path d="M9.6 9.6L13 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="icon-t3"/></svg>'
+    magnifier: '<svg width="13" height="13" viewBox="0 0 14 14"><circle cx="6" cy="6" r="4.6" stroke="currentColor" stroke-width="1.5" fill="none" class="icon-t3"/><path d="M9.6 9.6L13 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="icon-t3"/></svg>',
+    ig: '<svg width="17" height="17" viewBox="0 0 18 18"><rect x="1.6" y="1.6" width="14.8" height="14.8" rx="4.4" stroke="currentColor" stroke-width="1.4" fill="none"/><circle cx="9" cy="9" r="3.5" stroke="currentColor" stroke-width="1.4" fill="none"/><circle cx="13.1" cy="4.9" r="1" fill="currentColor"/></svg>'
 };
 
 /* -------------------------------------------------------------- helpers -- */
@@ -80,7 +101,13 @@ function normalizeClient(c) {
         id: c.firebaseKey,
         handle: c.handle || '',
         handleKey: c.handleKey || (c.handle || '').toLowerCase(),
+        name: c.name || '',
+        email: c.email || '',
+        phone: c.phone || '',
+        source: c.source || 'manual',
+        orderSummary: c.orderSummary || { count: 0, revenue: 0, lastOrderAt: 0 },
         niche: c.niche || '',
+        channel: c.channel || '',
         status: STATUSES.includes(c.status) ? c.status : 'Lead',
         note: c.note || '',
         needsReply: !!c.needsReply,
@@ -139,6 +166,18 @@ function timeLabel(ms) {
     return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
+// Order-customers may have no IG handle — fall back to name/email for display.
+function clientTitle(c) {
+    if (c.handle) return '@' + c.handle;
+    return c.name || c.email || 'Client';
+}
+
+function moneyShort(n) {
+    const v = Number(n || 0);
+    if (v >= 1000) return '$' + (v / 1000).toFixed(v % 1000 === 0 ? 0 : 1) + 'k';
+    return '$' + Math.round(v);
+}
+
 function ago(ms) {
     if (!ms) return '—';
     const diff = Date.now() - ms;
@@ -187,6 +226,16 @@ function statusPillStyle(status, big) {
 function dateLabel(ms) {
     const d = new Date(ms);
     return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+// Coloured "which of my pages did this client come from" badge. null when unassigned.
+function channelBadge(channelId) {
+    const ch = channelOf(channelId);
+    if (!ch) return null;
+    return h('span', {
+        class: 'chan-badge',
+        style: `color:${ch.color};background:color-mix(in srgb, ${ch.color} 15%, transparent)`
+    }, [h('span', { class: 'chan-dot', style: `background:${ch.color}` }), h('span', { text: ch.short })]);
 }
 
 /* Follow-up picker — shared by the Remind sheet and the add/edit form.
@@ -284,6 +333,7 @@ class ClientOS {
             sheet: null,           // detail | sort | form | remind
             detailId: null,
             statusPickerOpen: false,
+            channelPickerOpen: false,
             searchOpen: false,
             query: '',
             editingId: null,
@@ -389,7 +439,8 @@ class ClientOS {
 
     async load({ silent } = {}) {
         try {
-            const { clients } = await this.apiRequest('GET');
+            const { clients, channels } = await this.apiRequest('GET');
+            setChannels(channels);
             this.state.clients = (clients || []).map(normalizeClient);
             this.render();
         } catch (err) {
@@ -432,10 +483,12 @@ class ClientOS {
         const s = this.state;
         const statusF = s.filters.filter((f) => STATUSES.includes(f));
         const metaF = s.filters.filter((f) => ['today', 'needsReply', 'overdue', 'due'].includes(f));
+        const channelF = s.filters.filter((f) => f.startsWith('ch:')).map((f) => f.slice(3));
 
         let list = s.clients.filter((c) => {
             if (c.archived) return false;
             if (statusF.length && !statusF.includes(c.status)) return false;
+            if (channelF.length && !channelF.includes(c.channel)) return false;
             if (metaF.includes('today') && !isActionable(c)) return false;
             if (metaF.includes('needsReply') && !c.needsReply) return false;
             if (metaF.includes('overdue') && !isOverdue(c)) return false;
@@ -472,7 +525,8 @@ class ClientOS {
             class: 'chip' + (s.filters.length === 0 ? ' active' : ''),
             onclick: () => { s.filters = []; this.render(); }
         }, 'All'));
-        for (const [id, label] of CHIPS) {
+        const chips = [...CHIPS, ...CHANNELS.map((ch) => ['ch:' + ch.key, ch.short])];
+        for (const [id, label] of chips) {
             row.appendChild(h('button', {
                 class: 'chip' + (s.filters.includes(id) ? ' active' : ''),
                 onclick: () => {
@@ -503,16 +557,34 @@ class ClientOS {
         return { pills, hidden };
     }
 
+    // Direct "open their Instagram" button — lives on every row so it's one tap
+    // from the list, not just inside the detail sheet. Stops the row's tap-to-open.
+    igButton(c) {
+        if (!c.handle) return null;   // order-customers may have no Instagram
+        return h('button', {
+            class: 'row-ig', 'aria-label': 'Open @' + c.handle + ' on Instagram',
+            onclick: (e) => { e.stopPropagation(); this.openIG(c); }
+        }, h('span', { html: ICONS.ig }));
+    }
+
+    openIG(c) {
+        if (!c.handle) { this.toast('No Instagram handle on file'); return; }
+        window.open('https://instagram.com/' + encodeURIComponent(c.handle), '_blank', 'noopener');
+        const ch = channelOf(c.channel);
+        this.toast(ch ? 'Opening @' + c.handle + ' · reply from @' + ch.name : 'Opening @' + c.handle);
+    }
+
     renderRow(c, compact) {
         const { pills, hidden } = this.rowPills(c);
         const l1 = h('div', { class: 'row-l1' }, [
             c.needsReply ? h('span', { class: 'dot' }) : null,
-            h('span', { class: 'row-handle', text: '@' + c.handle }),
+            h('span', { class: 'row-handle', text: clientTitle(c) }),
             h('span', { class: 'row-niche', text: c.niche }),
             h('span', { class: 'row-time', text: ago(c.lastContactedAt) }),
-            h('span', { html: ICONS.chevron })
+            this.igButton(c)
         ]);
-        const l2children = [this.statusPill(c.status), ...pills];
+        const l2children = [this.statusPill(c.status), channelBadge(c.channel), ...pills];
+        if (c.orderSummary.count) l2children.push(h('span', { class: 'pill order-pill', text: c.orderSummary.count + '× · ' + moneyShort(c.orderSummary.revenue) }));
         if (hidden > 0) l2children.push(h('span', { class: 'row-more', text: '+' + hidden }));
         const l2 = h('div', { class: 'row-l2' }, l2children);
 
@@ -521,9 +593,11 @@ class ClientOS {
             onclick: () => this.openDetail(c.id)
         }, [h('div', { class: compact ? 'search-row-inner' : 'row-inner' }, compact ? [
             c.needsReply ? h('span', { class: 'dot' }) : null,
-            h('span', { class: 'row-handle', text: '@' + c.handle }),
+            h('span', { class: 'row-handle', text: clientTitle(c) }),
             h('span', { class: 'row-niche', text: c.niche }),
-            this.statusPill(c.status)
+            channelBadge(c.channel),
+            this.statusPill(c.status),
+            this.igButton(c)
         ] : [l1, l2])]);
     }
 
@@ -550,6 +624,7 @@ class ClientOS {
     closeOverlay() {
         this.state.sheet = null;
         this.state.statusPickerOpen = false;
+        this.state.channelPickerOpen = false;
         this.state.addingHighlight = false;
         this.dom.overlay.textContent = '';
     }
@@ -574,6 +649,7 @@ class ClientOS {
     openDetail(id) {
         this.state.detailId = id;
         this.state.statusPickerOpen = false;
+        this.state.channelPickerOpen = false;
         this.state.addingHighlight = false;
         if (this.state.searchOpen) this.closeSearch();
         this.openSheet('detail', (body) => this.buildDetail(body));
@@ -590,21 +666,29 @@ class ClientOS {
 
         // identity + needs-reply toggle
         body.appendChild(h('div', { class: 'd-identity' }, [
-            h('span', { class: 'd-handle', text: '@' + c.handle }),
+            h('span', { class: 'd-handle', text: clientTitle(c) }),
             c.needsReply
                 ? h('button', { class: 'd-needsreply', style: 'border:none;cursor:pointer;font-family:inherit', onclick: () => this.patch(c.id, { needsReply: false }, { toast: 'Reply flag cleared' }) }, 'Needs reply ✕')
                 : h('button', { class: 'hi-add', onclick: () => this.patch(c.id, { needsReply: true }, { toast: 'Flagged — needs reply' }) }, '+ Flag reply')
         ]));
         if (c.niche) body.appendChild(h('div', { class: 'd-niche', text: c.niche }));
 
-        // status + meta
+        // status + channel + meta
         const statusBtn = h('button', {
             class: 'pill status big status-pick-btn',
             style: statusPillStyle(c.status),
-            onclick: () => { this.state.statusPickerOpen = !this.state.statusPickerOpen; this.refreshDetail(); }
+            onclick: () => { this.state.statusPickerOpen = !this.state.statusPickerOpen; this.state.channelPickerOpen = false; this.refreshDetail(); }
         }, [h('span', { text: c.status }), h('span', { html: ICONS.caret })]);
+
+        const ch = channelOf(c.channel);
+        const channelBtn = h('button', {
+            class: 'pill status big status-pick-btn',
+            style: ch ? `color:${ch.color};background:color-mix(in srgb, ${ch.color} 15%, transparent)` : 'color:var(--t3);background:var(--elev)',
+            onclick: () => { this.state.channelPickerOpen = !this.state.channelPickerOpen; this.state.statusPickerOpen = false; this.refreshDetail(); }
+        }, [h('span', { html: ICONS.ig }), h('span', { text: ch ? ch.short : 'No page' }), h('span', { html: ICONS.caret })]);
+
         const metaText = `Last contacted ${ago(c.lastContactedAt)} · Added ${c.createdAt ? dateLabel(c.createdAt) : '—'}`;
-        body.appendChild(h('div', { class: 'd-status-row' }, [statusBtn, h('span', { class: 'd-meta', text: metaText })]));
+        body.appendChild(h('div', { class: 'd-status-row' }, [statusBtn, channelBtn, h('span', { class: 'd-meta', text: metaText })]));
 
         if (this.state.statusPickerOpen) {
             body.appendChild(h('div', { class: 'status-picker' }, STATUSES.map((st) => h('button', {
@@ -617,12 +701,26 @@ class ClientOS {
             }, st))));
         }
 
+        if (this.state.channelPickerOpen) {
+            const opts = [{ key: '', short: 'No page', color: '' }, ...CHANNELS];
+            body.appendChild(h('div', { class: 'status-picker' }, opts.map((opt) => h('button', {
+                class: 'pill status big status-opt' + (c.channel === opt.key ? ' selected' : ''),
+                style: (opt.key
+                    ? `color:${opt.color};background:color-mix(in srgb, ${opt.color} 15%, transparent)` + (c.channel === opt.key ? `;outline:1.5px solid ${opt.color}` : '')
+                    : 'color:var(--t2);background:var(--elev)' + (c.channel === opt.key ? ';outline:1.5px solid var(--line2)' : '')),
+                onclick: () => {
+                    this.state.channelPickerOpen = false;
+                    this.patch(c.id, { channel: opt.key, history: this.withHistory(c, opt.key ? 'Page → ' + opt.short : 'Page cleared') }, { toast: opt.key ? 'Page → ' + opt.short : 'Page cleared' });
+                }
+            }, opt.short))));
+        }
+
         // quick actions
         const qa = (icon, label, cls, onclick) => h('button', { class: 'qa' + (cls ? ' ' + cls : ''), onclick }, [
             h('span', { html: icon }), h('span', { text: label })
         ]);
         body.appendChild(h('div', { class: 'qa-grid' }, [
-            qa(ICONS.dm, 'Open IG', 'primary', () => { window.open('https://instagram.com/' + encodeURIComponent(c.handle), '_blank', 'noopener'); this.toast('Opening @' + c.handle); }),
+            qa(ICONS.dm, 'Open IG', 'primary', () => this.openIG(c)),
             qa(ICONS.check, 'Contacted', null, () => this.patch(c.id, { lastContactedAt: Date.now(), needsReply: false, history: this.withHistory(c, 'Marked contacted') }, { toast: 'Marked contacted' })),
             qa(ICONS.bell, 'Remind', null, () => this.openReminder()),
             qa(ICONS.pencil, 'Edit', null, () => this.openForm(c.id)),
@@ -640,6 +738,17 @@ class ClientOS {
             h('span', { class: 'label', text: 'Follow-up' }),
             h('div', { class: 'fu-value-wrap' }, fuValue)
         ]));
+
+        // orders summary (read-only; full detail lives in the admin)
+        if (c.orderSummary.count) {
+            body.appendChild(h('div', { class: 'followup-row', style: 'cursor:default' }, [
+                h('span', { class: 'label', text: 'Orders' }),
+                h('div', { class: 'fu-value-wrap' }, [
+                    h('span', { class: 'value', text: c.orderSummary.count + ' · ' + moneyShort(c.orderSummary.revenue) }),
+                    c.orderSummary.lastOrderAt ? h('span', { class: 'sub', text: 'last ' + ago(c.orderSummary.lastOrderAt) }) : null
+                ])
+            ]));
+        }
 
         // highlights
         const hiWrap = h('div', { class: 'hi-wrap' });
@@ -803,8 +912,8 @@ class ClientOS {
         const c = editing ? this.findClient(id) : null;
         this.state.editingId = id;
         this.state.form = c
-            ? { handle: '@' + c.handle, niche: c.niche, status: c.status, note: c.note, fuAt: c.followUpAt, fuHasTime: c.followUpHasTime }
-            : { handle: '', niche: '', status: 'Lead', note: '', fuAt: null, fuHasTime: false };
+            ? { handle: '@' + c.handle, niche: c.niche, status: c.status, channel: c.channel, note: c.note, fuAt: c.followUpAt, fuHasTime: c.followUpHasTime }
+            : { handle: '', niche: '', status: 'Lead', channel: '', note: '', fuAt: null, fuHasTime: false };
 
         this.openSheet('form', (body) => {
             const f = this.state.form;
@@ -819,11 +928,27 @@ class ClientOS {
             const renderStatus = () => {
                 statusWrap.textContent = '';
                 STATUSES.forEach((st) => statusWrap.appendChild(h('button', {
+                    type: 'button',
                     class: 'pill status big', style: statusPillStyle(st) + (f.status === st ? `;outline:1.5px solid var(--st-${st})` : ';opacity:.6'),
                     onclick: () => { f.status = st; renderStatus(); }
                 }, st)));
             };
             renderStatus();
+
+            const channelWrap = h('div', { class: 'pill-wrap' });
+            const renderChannel = () => {
+                channelWrap.textContent = '';
+                const opts = [{ key: '', short: 'No page', color: '' }, ...CHANNELS];
+                opts.forEach((opt) => channelWrap.appendChild(h('button', {
+                    type: 'button',
+                    class: 'pill status big',
+                    style: (opt.key
+                        ? `color:${opt.color};background:color-mix(in srgb, ${opt.color} 15%, transparent)` + (f.channel === opt.key ? `;outline:1.5px solid ${opt.color}` : ';opacity:.6')
+                        : 'color:var(--t2);background:var(--elev)' + (f.channel === opt.key ? ';outline:1.5px solid var(--line2)' : ';opacity:.6')),
+                    onclick: () => { f.channel = opt.key; renderChannel(); }
+                }, opt.short)));
+            };
+            renderChannel();
 
             const picker = fuPicker(f.fuAt, f.fuHasTime);
 
@@ -831,11 +956,12 @@ class ClientOS {
                 handleInput,
                 nicheInput,
                 h('div', {}, [h('div', { class: 'field-label', text: 'Status' }), statusWrap]),
+                h('div', {}, [h('div', { class: 'field-label', text: 'Page · which of your accounts they came from' }), channelWrap]),
                 h('div', {}, [h('div', { class: 'field-label', text: 'Follow-up' }), picker.node]),
                 noteInput,
                 h('button', {
                     class: 'form-cta', onclick: () => this.saveForm({
-                        handle: handleInput.value, niche: nicheInput.value, note: noteInput.value, status: f.status, fu: picker.get()
+                        handle: handleInput.value, niche: nicheInput.value, note: noteInput.value, status: f.status, channel: f.channel, fu: picker.get()
                     })
                 }, editing ? 'Save changes' : 'Add client')
             ]));
@@ -848,11 +974,12 @@ class ClientOS {
         const fu = vals.fu || { at: null, hasTime: false };
         const followUpAt = fu.at || null;
         const followUpHasTime = !!followUpAt && !!fu.hasTime;
+        const channel = channelOf(vals.channel) ? vals.channel : '';
 
         if (this.state.editingId) {
             const c = this.findClient(this.state.editingId);
             this.patch(c.id, {
-                handle, handleKey: handle.toLowerCase(), niche: vals.niche, status: vals.status, note: vals.note, followUpAt, followUpHasTime
+                handle, handleKey: handle.toLowerCase(), niche: vals.niche, status: vals.status, channel, note: vals.note, followUpAt, followUpHasTime
             }, { toast: 'Saved' });
             this.openDetail(c.id);
             return;
@@ -862,7 +989,7 @@ class ClientOS {
         try {
             this.closeOverlay();
             this.dom.busy.hidden = false;
-            const { firebaseKey } = await this.apiRequest('POST', { data: { handle, niche: vals.niche, status: vals.status, note: vals.note, followUpAt, followUpHasTime } });
+            const { firebaseKey } = await this.apiRequest('POST', { data: { handle, niche: vals.niche, status: vals.status, channel, note: vals.note, followUpAt, followUpHasTime } });
             // A brand-new client isn't "actionable" yet, so the default Today filter
             // would hide it. Drop to All and open it so it's never lost after adding.
             this.state.filters = [];

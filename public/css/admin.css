@@ -4,31 +4,51 @@
    ============================================================ */
 
 :root {
-    --bg: #0f0f10;
-    --surface: #161618;
-    --card: #1a1a1d;
-    --card-press: #232327;
-    --border: #2a2a2f;
-    --border-strong: #3a3a40;
+    /* Shared design language with the CRM: alpha-line / opacity-text palette,
+       monochrome surfaces, colour reserved for urgency + status only. */
+    --bg: #0F1013;
+    --surface: #17181C;
+    --card: #1F2126;
+    --card-press: #26282E;
+    --elev: #1F2126;
+    --elev2: #26282E;
+    --border: rgba(255, 255, 255, 0.07);
+    --border-strong: rgba(255, 255, 255, 0.12);
 
-    --text: #ececee;
-    --text-2: #a1a1a6;
-    --text-3: #6e6e76;
+    --text: #EDEEF0;
+    --text-2: rgba(228, 230, 238, 0.62);
+    --text-3: rgba(228, 230, 238, 0.38);
 
+    /* near-white primary action (matches CRM's monochrome buttons/active chips) */
+    --btn: #EDEEF0;
+    --btn-text: #101114;
+
+    /* red is identity + urgency only, never a default UI colour */
     --accent: #ff3b30;
     --accent-strong: #ff6b3d;
     --accent-soft: rgba(255, 69, 58, .14);
 
-    --green: #30d158;
-    --green-soft: rgba(48, 209, 88, .13);
-    --amber: #ffd60a;
-    --amber-soft: rgba(255, 214, 10, .11);
-    --red: #ff453a;
-    --red-soft: rgba(255, 69, 58, .12);
-    --blue: #0a84ff;
-    --blue-soft: rgba(10, 132, 255, .15);
-    --slate: #8e8e96;
-    --slate-soft: rgba(142, 142, 150, .14);
+    --green: #3BA765;
+    --green-soft: rgba(59, 167, 101, .15);
+    --amber: #E5963C;
+    --amber-soft: rgba(229, 150, 60, .15);
+    --red: #F0555C;
+    --red-soft: rgba(240, 85, 92, .14);
+    /* blue is deliberately dropped from the UI; kept as neutral aliases so any
+       stray reference degrades to slate rather than reintroducing blue. */
+    --blue: #8A8F98;
+    --blue-soft: rgba(138, 143, 152, .16);
+    --slate: #8A8F98;
+    --slate-soft: rgba(138, 143, 152, .16);
+
+    /* status ramp shared with the CRM */
+    --st-Lead: #8A8F98;
+    --st-Warm: #E5963C;
+    --st-Active: #3BA765;
+    --st-Client: #31A8A0;
+    --st-VIP: #C9A03E;
+    --st-Stale: #8A8F98;
+    --st-Dead: #62666D;
 
     --radius: 14px;
     --radius-sm: 10px;
@@ -37,7 +57,29 @@
     --tabbar-h: 62px;
 
     --shadow-sheet: 0 -18px 60px rgba(0, 0, 0, .55);
-    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Inter, sans-serif;
+    --font: -apple-system, "SF Pro Text", "Helvetica Neue", BlinkMacSystemFont, "Segoe UI", Roboto, Inter, system-ui, sans-serif;
+}
+
+[data-theme="light"] {
+    --bg: #F7F7F8;
+    --surface: #FFFFFF;
+    --card: #FFFFFF;
+    --card-press: #EEEEF0;
+    --elev: #EEEEF0;
+    --elev2: #E4E4E8;
+    --border: rgba(18, 19, 23, 0.08);
+    --border-strong: rgba(18, 19, 23, 0.16);
+    --text: #1B1C20;
+    --text-2: rgba(27, 28, 32, 0.62);
+    --text-3: rgba(27, 28, 32, 0.42);
+    --btn: #1B1C20;
+    --btn-text: #FFFFFF;
+    --accent: #D93A42;
+    --accent-strong: #C1731E;
+    --accent-soft: rgba(217, 58, 66, .12);
+    --red: #D93A42;
+    --amber: #C1731E;
+    --shadow-sheet: 0 -18px 60px rgba(20, 20, 24, .18);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -110,8 +152,8 @@ code {
 .btn:active { transform: scale(.97); }
 .btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover { background: var(--accent-strong); }
+.btn-primary { background: var(--btn); color: var(--btn-text); }
+.btn-primary:hover { filter: brightness(.92); }
 .btn-ghost { background: transparent; border-color: var(--border-strong); color: var(--text-2); }
 .btn-ghost:hover { color: var(--text); border-color: var(--text-3); }
 .btn-danger { background: var(--red-soft); color: var(--red); border-color: transparent; }
@@ -311,9 +353,9 @@ code {
     transition: color .15s;
 }
 .tab svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.tab.active { color: var(--accent-strong); }
+.tab.active { color: var(--text); }
 .tab:hover { color: var(--text-2); }
-.tab.active:hover { color: var(--accent-strong); }
+.tab.active:hover { color: var(--text); }
 
 .tab-badge {
     position: absolute;
@@ -402,9 +444,9 @@ code {
 }
 .chip:hover { color: var(--text); }
 .chip.active {
-    background: var(--accent-soft);
-    border-color: rgba(255, 90, 70, .45);
-    color: var(--accent-strong);
+    background: var(--btn);
+    border-color: var(--btn);
+    color: var(--btn-text);
 }
 .chip .chip-n {
     font-size: 11.5px;
@@ -415,7 +457,7 @@ code {
     color: var(--text-2);
     font-variant-numeric: tabular-nums;
 }
-.chip.active .chip-n { background: rgba(255, 90, 70, .22); color: var(--accent-strong); }
+.chip.active .chip-n { background: rgba(0, 0, 0, .18); color: var(--btn-text); }
 
 .chip svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -544,7 +586,9 @@ code {
     line-height: 1.3;
     overflow-wrap: anywhere;
 }
-.card-title .flame { width: 15px; height: 15px; flex: 0 0 auto; fill: none; stroke: var(--red); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.flame { width: 15px; height: 15px; flex: 0 0 auto; fill: none; stroke: var(--red); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -2px; }
+.card-title .flame { width: 15px; height: 15px; }
+.profile-row-name .flame { width: 17px; height: 17px; margin-right: 4px; }
 
 .card-sub {
     display: flex;
@@ -599,12 +643,12 @@ code {
 .pill-chan { background: var(--slate-soft); color: var(--slate); }
 .pill-client { background: var(--accent-soft); color: var(--accent-strong); }
 
-/* Status pills */
+/* Status pills — no blue; in_progress = teal (working), new = accent (needs action) */
 .pill-pending { background: var(--amber-soft); color: var(--amber); }
-.pill-in_progress { background: var(--blue-soft); color: var(--blue); }
+.pill-in_progress { background: color-mix(in srgb, var(--st-Client) 16%, transparent); color: var(--st-Client); }
 .pill-completed { background: var(--green-soft); color: var(--green); }
 .pill-cancelled { background: var(--slate-soft); color: var(--slate); }
-.pill-new { background: var(--blue-soft); color: var(--blue); }
+.pill-new { background: var(--accent-soft); color: var(--accent-strong); }
 .pill-contacted { background: var(--amber-soft); color: var(--amber); }
 .pill-converted { background: var(--green-soft); color: var(--green); }
 .pill-archived { background: var(--slate-soft); color: var(--slate); }
@@ -752,7 +796,7 @@ code {
     transition: background .15s, color .15s;
 }
 .seg:hover { color: var(--text); }
-.seg.active { background: var(--accent-soft); color: var(--accent-strong); }
+.seg.active { background: var(--btn); color: var(--btn-text); }
 
 /* Activity segmented (in forms) */
 .seg.seg-active.active { background: var(--green-soft); color: var(--green); }
@@ -970,7 +1014,7 @@ code {
         font-size: 14px;
     }
     .tab svg { width: 19px; height: 19px; }
-    .tab.active { background: var(--accent-soft); }
+    .tab.active { background: var(--elev); color: var(--text); }
     .tab:hover:not(.active) { background: var(--surface); }
     .tab-badge {
         position: static;
