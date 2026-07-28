@@ -247,6 +247,45 @@ body {
 }
 .row-ig:active { background: var(--elev2); }
 
+/* Red blip — manual "needs attention" flag, or an order still in progress.
+   Derived (in-progress) pulses; a manual flag is solid. */
+.blip {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--red);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent);
+    cursor: pointer;
+    animation: blipPulse 2s ease-in-out infinite;
+    -webkit-tap-highlight-color: transparent;
+}
+.blip.blip-manual { animation: none; }
+.blip:active { transform: scale(.85); }
+@keyframes blipPulse {
+    0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent); }
+    50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--red) 6%, transparent); }
+}
+
+.pill.in-progress-pill { color: var(--red); background: color-mix(in srgb, var(--red) 14%, transparent); font-weight: 590; }
+.pill.order-pill { color: var(--t2); background: var(--elev2); font-variant-numeric: tabular-nums; }
+
+.order-live-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 6px;
+    padding: 9px 12px;
+    background: var(--elev);
+    border-radius: 10px;
+}
+.order-live-row .label { font-size: 12.5px; font-weight: 560; color: var(--t1); }
+.order-live-row .sub { font-size: 11.5px; color: var(--t3); }
+.order-live-row a.link { color: var(--t2); text-decoration: none; }
+
 /* channel badge — which of your pages the client came in through */
 .chan-badge {
     display: inline-flex;

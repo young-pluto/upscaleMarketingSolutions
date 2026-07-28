@@ -626,6 +626,30 @@ code {
 .ibtn-expand svg { transition: transform .2s; }
 .card.expanded .ibtn-expand svg { transform: rotate(180deg); }
 
+/* Red blip — "needs attention": manual flag or an order still in progress.
+   Derived (order in progress) pulses; a manual flag is solid. */
+.blip {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    flex: 0 0 auto;
+    margin-right: 6px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--red);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent);
+    cursor: pointer;
+    vertical-align: middle;
+    animation: blipPulse 2s ease-in-out infinite;
+}
+.blip.blip-manual { animation: none; }
+button.blip:active { transform: scale(.85); }
+@keyframes blipPulse {
+    0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 22%, transparent); }
+    50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--red) 6%, transparent); }
+}
+
 /* ============ BADGES & PILLS ============ */
 
 .pill {

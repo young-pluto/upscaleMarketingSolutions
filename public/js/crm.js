@@ -45,13 +45,28 @@ const SORTS = [
     ['alpha', 'A–Z']
 ];
 
+// Trial leads live in their own node (trialCampaignSubmissions) and stay separate
+// from clients — the CRM surfaces them read-mostly under the "Leads" chip so the
+// admin's lead labels are visible here too.
+const LEAD_STATUSES = ['new', 'completed', 'contacted', 'converted', 'archived'];
+const LEAD_LABEL = { new: 'New', completed: 'Completed', contacted: 'Contacted', converted: 'Converted', archived: 'Archived' };
+const LEAD_COLOR = { new: 'var(--red)', completed: 'var(--st-Active)', contacted: 'var(--orange)', converted: 'var(--st-Client)', archived: 'var(--st-Dead)' };
+function normalizeLeadStatus(s) {
+    const v = String(s || 'new');
+    return LEAD_STATUSES.includes(v) ? v : (v === 'qualified' ? 'completed' : 'new');
+}
+
 const CHIPS = [
     ['today', 'Today'],
+    ['leads', 'Leads'],
+    ['blip', 'Blip'],
+    ['inprogress', 'In progress'],
     ['needsReply', 'Needs reply'],
     ['overdue', 'Overdue'],
     ['due', 'Due today'],
     ...STATUSES.map((s) => [s, s])
 ];
+const META_FILTERS = ['today', 'blip', 'inprogress', 'needsReply', 'overdue', 'due'];
 
 function readPreference(key, fallback) {
     try { return localStorage.getItem(key) || fallback; } catch (error) { return fallback; }
@@ -105,7 +120,14 @@ function normalizeClient(c) {
         email: c.email || '',
         phone: c.phone || '',
         source: c.source || 'manual',
-        orderSummary: c.orderSummary || { count: 0, revenue: 0, lastOrderAt: 0 },
+        // Orders + rollups ride along on the client record (server-projected).
+        orders: c.orders || {},
+        orderCount: Number(c.orderCount || 0),
+        revenue: Number(c.revenue || 0),
+        lastOrderAt: Number(c.lastOrderAt || 0),
+        hasActiveOrder: !!c.hasActiveOrder,
+        urgent: !!c.urgent,
+        orderSummary: c.orderSummary || { count: Number(c.orderCount || 0), revenue: Number(c.revenue || 0), lastOrderAt: Number(c.lastOrderAt || 0) },
         niche: c.niche || '',
         channel: c.channel || '',
         status: STATUSES.includes(c.status) ? c.status : 'Lead',
@@ -178,6 +200,9 @@ function moneyShort(n) {
     return '$' + Math.round(v);
 }
 
+// The red blip: a manual "needs attention" flag OR an order still in progress.
+function hasBlip(c) { return !!(c && (c.urgent || c.hasActiveOrder)); }
+
 function ago(ms) {
     if (!ms) return '—';
     const diff = Date.now() - ms;
@@ -216,7 +241,7 @@ function isCold(c) {
     if (!c.lastContactedAt) return true;
     return (Date.now() - c.lastContactedAt) > COLD_DAYS * DAY;
 }
-function isActionable(c) { return c.needsReply || isOverdue(c) || isDueToday(c) || isCold(c); }
+function isActionable(c) { return c.needsReply || hasBlip(c) || isOverdue(c) || isDueToday(c) || isCold(c); }
 
 function statusPillStyle(status, big) {
     const v = `var(--st-${status})`;
@@ -326,6 +351,7 @@ class ClientOS {
         this.currentUser = null;
         this.state = {
             clients: [],
+            leads: [],
             // Today is the default action queue: overdue/due follow-ups, reply
             // flags and clients that have never been contacted or gone cold.
             filters: ['today'],
@@ -439,9 +465,19 @@ class ClientOS {
 
     async load({ silent } = {}) {
         try {
-            const { clients, channels } = await this.apiRequest('GET');
+            const { clients, channels, leads } = await this.apiRequest('GET');
             setChannels(channels);
             this.state.clients = (clients || []).map(normalizeClient);
+            this.state.leads = (leads || []).map((l) => ({
+                id: l.firebaseKey,
+                name: l.fullName || '',
+                status: normalizeLeadStatus(l.leadStatus),
+                genre: l.genre || '',
+                youtubeLink: l.youtubeLink || '',
+                instagram: (l.instagramLink || '').replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/.*$/, ''),
+                note: l.adminNotes || '',
+                at: Number(l.createdAt) || (l.submittedAtIso ? Date.parse(l.submittedAtIso) : 0) || 0
+            }));
             this.render();
         } catch (err) {
             if (!silent) this.toast('Could not load clients');
@@ -473,16 +509,66 @@ class ClientOS {
 
     /* ----------------------------------------------------------- render -- */
     render() {
+        this.renderChips();
+        if (this.state.filters.includes('leads')) { this.renderLeadList(); return; }
         const rows = this.visibleClients();   // filter+sort once, share with count + list
         this.renderCount(rows);
-        this.renderChips();
         this.renderList(rows);
+    }
+
+    /* ---- trial leads (separate node, shown read-mostly) ---- */
+    visibleLeads() {
+        const q = this.state.query.trim().toLowerCase();
+        const statusF = this.state.filters.filter((f) => LEAD_STATUSES.includes(f.replace('lead:', '')) && f.startsWith('lead:')).map((f) => f.slice(5));
+        return (this.state.leads || [])
+            .filter((l) => !statusF.length || statusF.includes(l.status))
+            .filter((l) => !q || l.name.toLowerCase().includes(q) || l.genre.toLowerCase().includes(q) || l.instagram.toLowerCase().includes(q))
+            .sort((a, b) => b.at - a.at);
+    }
+
+    renderLeadList() {
+        const rows = this.visibleLeads();
+        const total = (this.state.leads || []).length;
+        this.dom.count.textContent = rows.length === total ? `${total} leads` : `${rows.length} of ${total}`;
+        const list = this.dom.list;
+        list.textContent = '';
+        if (!rows.length) {
+            list.appendChild(h('div', { class: 'empty' }, [
+                h('div', { class: 'title', text: 'No trial leads' }),
+                h('div', { class: 'sub', text: 'Trial campaign submissions show up here with their status.' })
+            ]));
+            return;
+        }
+        const frag = document.createDocumentFragment();
+        for (const l of rows) {
+            const color = LEAD_COLOR[l.status] || 'var(--t3)';
+            frag.appendChild(h('div', { class: 'row' }, [h('div', { class: 'row-inner' }, [
+                h('div', { class: 'row-l1' }, [
+                    h('span', { class: 'row-handle', text: l.name || (l.instagram ? '@' + l.instagram : 'Lead') }),
+                    h('span', { class: 'row-niche', text: l.genre }),
+                    h('span', { class: 'row-time', text: l.at ? ago(l.at) : '—' }),
+                    l.instagram
+                        ? h('button', {
+                            class: 'row-ig', 'aria-label': 'Open Instagram',
+                            onclick: (e) => { e.stopPropagation(); window.open('https://instagram.com/' + encodeURIComponent(l.instagram), '_blank', 'noopener'); }
+                        }, h('span', { html: ICONS.ig }))
+                        : null
+                ]),
+                h('div', { class: 'row-l2' }, [
+                    h('span', { class: 'pill', style: `color:${color};background:color-mix(in srgb, ${color} 15%, transparent);font-weight:590`, text: LEAD_LABEL[l.status] }),
+                    l.youtubeLink ? h('a', { class: 'pill', style: 'color:var(--t2);background:var(--elev2);text-decoration:none', href: l.youtubeLink, target: '_blank', rel: 'noopener noreferrer', onclick: (e) => e.stopPropagation(), text: 'video ↗' }) : null,
+                    l.note ? h('span', { class: 'row-more', text: l.note.slice(0, 40) }) : null
+                ])
+            ])]));
+        }
+        list.appendChild(frag);
+        list.appendChild(h('div', { style: 'height:8px' }));
     }
 
     visibleClients() {
         const s = this.state;
         const statusF = s.filters.filter((f) => STATUSES.includes(f));
-        const metaF = s.filters.filter((f) => ['today', 'needsReply', 'overdue', 'due'].includes(f));
+        const metaF = s.filters.filter((f) => META_FILTERS.includes(f));
         const channelF = s.filters.filter((f) => f.startsWith('ch:')).map((f) => f.slice(3));
 
         let list = s.clients.filter((c) => {
@@ -490,6 +576,8 @@ class ClientOS {
             if (statusF.length && !statusF.includes(c.status)) return false;
             if (channelF.length && !channelF.includes(c.channel)) return false;
             if (metaF.includes('today') && !isActionable(c)) return false;
+            if (metaF.includes('blip') && !hasBlip(c)) return false;
+            if (metaF.includes('inprogress') && !c.hasActiveOrder) return false;
             if (metaF.includes('needsReply') && !c.needsReply) return false;
             if (metaF.includes('overdue') && !isOverdue(c)) return false;
             if (metaF.includes('due') && !isDueToday(c)) return false;
@@ -530,7 +618,10 @@ class ClientOS {
             row.appendChild(h('button', {
                 class: 'chip' + (s.filters.includes(id) ? ' active' : ''),
                 onclick: () => {
-                    s.filters = s.filters.includes(id) ? s.filters.filter((x) => x !== id) : [...s.filters, id];
+                    const on = s.filters.includes(id);
+                    // "Leads" is a mode, not a filter — it swaps the list wholesale.
+                    if (id === 'leads') s.filters = on ? [] : ['leads'];
+                    else s.filters = (on ? s.filters.filter((x) => x !== id) : [...s.filters, id]).filter((x) => x !== 'leads');
                     this.render();
                 }
             }, label));
@@ -574,9 +665,23 @@ class ClientOS {
         this.toast(ch ? 'Opening @' + c.handle + ' · reply from @' + ch.name : 'Opening @' + c.handle);
     }
 
+    // Tappable red blip — toggles the manual flag; also lit by an in-progress order.
+    blipEl(c) {
+        if (!hasBlip(c)) return null;
+        return h('button', {
+            class: 'blip' + (c.urgent ? ' blip-manual' : ''),
+            title: c.urgent ? 'Flagged — tap to clear' : 'Order in progress — tap to flag',
+            onclick: (e) => {
+                e.stopPropagation();
+                this.patch(c.id, { urgent: !c.urgent }, { toast: c.urgent ? 'Blip cleared' : 'Blip on' });
+            }
+        });
+    }
+
     renderRow(c, compact) {
         const { pills, hidden } = this.rowPills(c);
         const l1 = h('div', { class: 'row-l1' }, [
+            this.blipEl(c),
             c.needsReply ? h('span', { class: 'dot' }) : null,
             h('span', { class: 'row-handle', text: clientTitle(c) }),
             h('span', { class: 'row-niche', text: c.niche }),
@@ -584,7 +689,8 @@ class ClientOS {
             this.igButton(c)
         ]);
         const l2children = [this.statusPill(c.status), channelBadge(c.channel), ...pills];
-        if (c.orderSummary.count) l2children.push(h('span', { class: 'pill order-pill', text: c.orderSummary.count + '× · ' + moneyShort(c.orderSummary.revenue) }));
+        if (c.hasActiveOrder) l2children.push(h('span', { class: 'pill in-progress-pill', text: 'In progress' }));
+        if (c.orderCount) l2children.push(h('span', { class: 'pill order-pill', text: c.orderCount + '× · ' + moneyShort(c.revenue) }));
         if (hidden > 0) l2children.push(h('span', { class: 'row-more', text: '+' + hidden }));
         const l2 = h('div', { class: 'row-l2' }, l2children);
 
@@ -592,6 +698,7 @@ class ClientOS {
             class: compact ? 'search-row' : 'row',
             onclick: () => this.openDetail(c.id)
         }, [h('div', { class: compact ? 'search-row-inner' : 'row-inner' }, compact ? [
+            this.blipEl(c),
             c.needsReply ? h('span', { class: 'dot' }) : null,
             h('span', { class: 'row-handle', text: clientTitle(c) }),
             h('span', { class: 'row-niche', text: c.niche }),
@@ -664,14 +771,19 @@ class ClientOS {
         body.textContent = '';
         if (!c) return;
 
-        // identity + needs-reply toggle
+        // identity + blip + needs-reply toggle
         body.appendChild(h('div', { class: 'd-identity' }, [
+            this.blipEl(c),
             h('span', { class: 'd-handle', text: clientTitle(c) }),
+            c.urgent
+                ? null
+                : h('button', { class: 'hi-add', onclick: () => this.patch(c.id, { urgent: true }, { toast: 'Blip on' }) }, '+ Blip'),
             c.needsReply
                 ? h('button', { class: 'd-needsreply', style: 'border:none;cursor:pointer;font-family:inherit', onclick: () => this.patch(c.id, { needsReply: false }, { toast: 'Reply flag cleared' }) }, 'Needs reply ✕')
                 : h('button', { class: 'hi-add', onclick: () => this.patch(c.id, { needsReply: true }, { toast: 'Flagged — needs reply' }) }, '+ Flag reply')
         ]));
-        if (c.niche) body.appendChild(h('div', { class: 'd-niche', text: c.niche }));
+        const subBits = [c.niche, c.name && c.handle ? c.name : '', c.email].filter(Boolean).join(' · ');
+        if (subBits) body.appendChild(h('div', { class: 'd-niche', text: subBits }));
 
         // status + channel + meta
         const statusBtn = h('button', {
@@ -739,15 +851,27 @@ class ClientOS {
             h('div', { class: 'fu-value-wrap' }, fuValue)
         ]));
 
-        // orders summary (read-only; full detail lives in the admin)
-        if (c.orderSummary.count) {
+        // orders — the client record carries them; keep it a quick glance here
+        // (full editing lives in the admin).
+        if (c.orderCount) {
             body.appendChild(h('div', { class: 'followup-row', style: 'cursor:default' }, [
                 h('span', { class: 'label', text: 'Orders' }),
                 h('div', { class: 'fu-value-wrap' }, [
-                    h('span', { class: 'value', text: c.orderSummary.count + ' · ' + moneyShort(c.orderSummary.revenue) }),
-                    c.orderSummary.lastOrderAt ? h('span', { class: 'sub', text: 'last ' + ago(c.orderSummary.lastOrderAt) }) : null
+                    h('span', { class: 'value', text: c.orderCount + ' · ' + moneyShort(c.revenue) }),
+                    c.lastOrderAt ? h('span', { class: 'sub', text: 'last ' + ago(c.lastOrderAt) }) : null
                 ])
             ]));
+            const live = Object.values(c.orders || {})
+                .filter((o) => !o.isTest && ['pending', 'in_progress'].includes(o.serviceStatus))
+                .sort((a, b) => (b.at || 0) - (a.at || 0));
+            for (const o of live) {
+                body.appendChild(h('div', { class: 'order-live-row' }, [
+                    h('span', { class: 'label', text: moneyShort(o.amount) + ' · ' + (o.serviceStatus === 'in_progress' ? 'In progress' : 'Pending') }),
+                    o.youtubeLink
+                        ? h('a', { class: 'sub link', href: o.youtubeLink, target: '_blank', rel: 'noopener noreferrer', text: 'video ↗' })
+                        : null
+                ]));
+            }
         }
 
         // highlights
@@ -1020,7 +1144,10 @@ class ClientOS {
         input.addEventListener('input', () => { this.state.query = input.value; this.renderSearchResults(results); });
         this.dom.overlay.appendChild(overlay);
         this.renderSearchResults(results);
-        setTimeout(() => input.focus(), 30);
+        // Focus synchronously, still inside the tap handler — iOS only raises the
+        // keyboard when focus() happens in the user-gesture call stack. A timeout
+        // (even 0ms) breaks that chain and forces a second tap.
+        input.focus({ preventScroll: true });
     }
 
     closeSearch() {

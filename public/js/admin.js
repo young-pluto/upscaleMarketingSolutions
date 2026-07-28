@@ -41,7 +41,8 @@ const CLIENT_SEGMENTS = [
     { key: 'order', label: 'From order' },
     { key: 'legacy', label: 'Old' },
     { key: 'active', label: 'Active', cls: 'chip-active-cat' },
-    { key: 'urgent', label: 'Hot', cls: 'chip-hot-cat', icon: 'flame' },
+    { key: 'inProgress', label: 'In progress' },
+    { key: 'urgent', label: 'Blip', cls: 'chip-hot-cat' },
 ];
 const PAGE_SIZE = 20;
 const DAY_MS = 86_400_000;
@@ -316,9 +317,33 @@ function normClient(r) {
         followUpHasTime: !!r.followUpHasTime,
         lastContactedAt: r.lastContactedAt || null,
         source: r.source || 'manual',
+        // Orders + rollups live on the client record itself (server-projected).
+        orders: r.orders || {},
+        orderCount: Number(r.orderCount || 0),
+        revenue: Number(r.revenue || 0),
+        lastOrderAt: Number(r.lastOrderAt || 0),
+        hasActiveOrder: !!r.hasActiveOrder,
         createdAt: r.createdAt || 0,
         updatedAt: r.updatedAt || 0,
     };
+}
+
+// One display name for a client, whichever identity fields they happen to have.
+// (Order-customers have no handle; CRM clients often have no name.)
+function clientLabel(c) {
+    if (!c) return '';
+    return c.name || (c.handle ? '@' + c.handle : '') || c.email || c.phone || 'Client';
+}
+
+// The red blip: a manual "needs attention" flag OR an order still in progress.
+function hasBlip(c) { return !!(c && (c.urgent || c.hasActiveOrder)); }
+function blipHtml(c, extra = '') {
+    if (!hasBlip(c)) return '';
+    const why = c.urgent
+        ? (c.hasActiveOrder ? 'Flagged + order in progress' : 'Flagged')
+        : 'Order in progress';
+    return `<button type="button" class="blip${c.urgent ? ' blip-manual' : ''}" data-blip ${extra}
+        title="${why}. Tap to toggle the flag." aria-label="${why}"></button>`;
 }
 
 function statusPillStyle(status) {
@@ -328,8 +353,20 @@ function statusPillStyle(status) {
 
 const SOURCE_LABEL = { order: 'From order', legacy: 'Old', usm: 'Client', crm: 'CRM', 'lead-outreach': 'Lead', manual: '' };
 
+// Read from the orders the client record itself carries (single source of truth).
+// Falls back to scanning the raw orders list if a projection hasn't landed yet.
+function clientOrders(client) {
+    const embedded = Object.values(client?.orders || {});
+    if (embedded.length) {
+        return embedded
+            .filter((o) => !o.isTest)
+            .map((o) => ({ ...o, firebaseKey: o.orderKey, createdAt: o.at }));
+    }
+    return S.orders.filter((o) => o.clientId === client?.firebaseKey && !isTestOrder(o));
+}
+
 function clientStats(client) {
-    const orders = S.orders.filter((o) => o.clientId === client.firebaseKey && !isTestOrder(o));
+    const orders = clientOrders(client);
     const totalSpent = orders.reduce((s, o) => s + Number(o.amount || 0), 0);
     const viewsGained = orders.reduce((s, o) =>
         (o.viewsStart != null && o.viewsEnd != null) ? s + Math.max(0, Number(o.viewsEnd) - Number(o.viewsStart)) : s, 0);
@@ -353,6 +390,17 @@ function fbRemove(path, okMsg) {
     return remove(ref(database, path))
         .then(() => { if (okMsg) toast(okMsg, 'success'); return true; })
         .catch((err) => { console.error(err); toast('Delete failed', 'error'); return false; });
+}
+
+// Toggle the manual red blip on any client.
+function toggleUrgent(key) {
+    const c = S.clients.find((x) => x.firebaseKey === key);
+    if (!c) return;
+    const next = !c.urgent;
+    crmApi('PATCH', { firebaseKey: key, updates: { urgent: next } })
+        .then(() => loadClientsFromApi())
+        .catch((err) => { console.error(err); toast('Save failed', 'error'); });
+    toast(next ? 'Blip on' : 'Blip cleared', 'success');
 }
 
 function cycleActivity(collection, key) {
@@ -493,6 +541,7 @@ function subscribeAll() {
     // One unified client source of truth, shared with the CRM. Loaded via the
     // token-authed API (crm/* isn't exposed to the client SDK by RTDB rules).
     loadClientsFromApi();
+    startClientPolling();
     sub('trialCampaignSubmissions', (rows) => { S.trials = rows; S.loaded.trials = true; }, 'leads', loadTrialsFromApi);
     sub('channels', (rows) => {
         rows.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
@@ -514,6 +563,7 @@ function subscribeAll() {
 function unsubscribeAll() {
     unsubscribers.forEach((off) => { try { off(); } catch (e) { } });
     unsubscribers = [];
+    stopClientPolling();
 }
 
 // Re-render whichever views the changed collection affects (only if visible)
@@ -581,7 +631,7 @@ async function authedApi(url, method, body) {
 const crmApi = (method, body) => authedApi('/api/crm-admin', method, body);
 const trialApi = (method, body) => authedApi('/api/trial-admin', method, body);
 
-async function loadClientsFromApi() {
+async function loadClientsFromApi({ silent } = {}) {
     try {
         const { clients } = await crmApi('GET');
         S.clients = (clients || []).map(normClient);
@@ -589,8 +639,22 @@ async function loadClientsFromApi() {
         rerender('clients');
     } catch (e) {
         console.error(e);
-        toast('Failed to load clients', 'error');
+        if (!silent) toast('Failed to load clients', 'error');
     }
+}
+
+// Clients come over the API rather than a realtime socket, so poll to pick up
+// edits made in the CRM (and refresh the moment the tab regains focus).
+let clientPollTimer = null;
+function startClientPolling() {
+    stopClientPolling();
+    clientPollTimer = setInterval(() => {
+        if (!S.user || document.hidden || sheetOpen || S.dirty) return;
+        loadClientsFromApi({ silent: true });
+    }, 20000);
+}
+function stopClientPolling() {
+    if (clientPollTimer) { clearInterval(clientPollTimer); clientPollTimer = null; }
 }
 
 function updateBadges() {
@@ -715,7 +779,9 @@ function orderCardHtml(o) {
                     <span class="money">${money(o.amount)}</span>
                     <span class="sep">·</span>
                     <span>${escapeHtml(relTime(orderTs(o)))}</span>
-                    ${o.clientName ? `<span class="pill pill-client">${escapeHtml(o.clientName)}</span>` : ''}
+                    ${o.clientId
+                        ? `<span class="pill pill-client">${escapeHtml(clientLabel(S.clients.find((x) => x.firebaseKey === o.clientId)) || o.clientName || 'Client')}</span>`
+                        : '<span class="pill pill-pending">Unassigned</span>'}
                 </div>
             </div>
             <div class="card-actions">
@@ -808,7 +874,12 @@ function openOrderSheet(firebaseKey) {
     }));
 
     // ---- client picker ----
-    let selClient = o.clientId ? { id: o.clientId, name: o.clientName, slug: o.clientSlug } : null;
+    // Resolve against the live client list so a client with only a handle/email
+    // (no name) still shows a real label instead of an empty pill.
+    const existing = o.clientId ? S.clients.find((x) => x.firebaseKey === o.clientId) : null;
+    let selClient = o.clientId
+        ? { id: o.clientId, name: clientLabel(existing) || o.clientName || 'Client', slug: (existing?.slug ?? o.clientSlug) || '' }
+        : null;
     const drawCurrent = () => {
         $('fClientCurrent').innerHTML = selClient
             ? `<span class="pill pill-client">${escapeHtml(selClient.name)}</span><button type="button" class="link-btn" id="fUnassign">Unassign</button>`
@@ -825,11 +896,11 @@ function openOrderSheet(firebaseKey) {
             .slice(0, 6);
         $('fClientResults').innerHTML =
             (term ? `<button type="button" class="picker-row picker-row-new" data-new>${icon('plus')} Create “${escapeHtml(q)}”</button>` : '')
-            + matches.map((c) => `<button type="button" class="picker-row" data-cid="${escAttr(c.firebaseKey)}"><strong>${escapeHtml(c.name || (c.handle ? '@' + c.handle : c.email))}</strong><small>${c.handle ? '@' + escapeHtml(c.handle) : escapeHtml(c.email || '')}</small></button>`).join('');
+            + matches.map((c) => `<button type="button" class="picker-row" data-cid="${escAttr(c.firebaseKey)}"><strong>${escapeHtml(clientLabel(c))}</strong><small>${escapeHtml([c.handle ? '@' + c.handle : '', c.email, c.orderCount ? c.orderCount + ' orders' : ''].filter(Boolean).join(' · '))}</small></button>`).join('');
         $('fClientResults').querySelectorAll('[data-cid]').forEach((row) => row.addEventListener('click', () => {
             const c = S.clients.find((x) => x.firebaseKey === row.dataset.cid);
             if (!c) return;
-            selClient = { id: c.firebaseKey, name: c.name, slug: c.slug };
+            selClient = { id: c.firebaseKey, name: clientLabel(c), slug: c.slug || '' };
             drawCurrent();
             $('fClientSearch').value = '';
             $('fClientResults').innerHTML = '';
@@ -849,7 +920,7 @@ function openOrderSheet(firebaseKey) {
     $('fClientSearch').addEventListener('focus', (e) => drawResults(e.target.value));
 
     // ---- save ----
-    $('fSave').addEventListener('click', () => {
+    $('fSave').addEventListener('click', async () => {
         const sv = $('fStart').value, evv = $('fEnd').value;
         const viewsStart = sv === '' ? null : Number(sv);
         const viewsEnd = evv === '' ? null : Number(evv);
@@ -861,7 +932,7 @@ function openOrderSheet(firebaseKey) {
         if (viewsRecorded && commentsGiven && likesGiven) finalStatus = 'completed';
 
         closeSheet();
-        fbUpdate(`orders/${firebaseKey}`, {
+        await fbUpdate(`orders/${firebaseKey}`, {
             serviceStatus: finalStatus,
             viewsStart, viewsEnd, commentsGiven, likesGiven,
             adminNotes: $('fNotes').value,
@@ -870,6 +941,9 @@ function openOrderSheet(firebaseKey) {
             clientSlug: selClient ? selClient.slug : null,
             updatedAt: Date.now(),
         }, 'Order saved');
+        // Re-read clients so the order (and the revenue/blip rollups) land on the
+        // client record — the server projects orders onto their owner on read.
+        await loadClientsFromApi();
     });
 
     // ---- delete ----
@@ -880,6 +954,7 @@ function openOrderSheet(firebaseKey) {
                 closeConfirm();
                 closeSheet();
                 await fbRemove(`orders/${firebaseKey}`, 'Order deleted');
+                await loadClientsFromApi();
             });
     });
 }
@@ -892,7 +967,8 @@ function matchesSegment(c, seg) {
         case 'order': return c.source === 'order';
         case 'legacy': return c.source === 'legacy';
         case 'active': return activityOf(c) === 'active';
-        case 'urgent': return !!c.urgent;
+        case 'inProgress': return !!c.hasActiveOrder;
+        case 'urgent': return hasBlip(c);
         default: return true;
     }
 }
@@ -935,16 +1011,17 @@ function clientCardHtml(c) {
     const ig = instagramUrl(c.instagram);
     const chan = channelName(c.channel);
     const src = SOURCE_LABEL[c.source] || '';
-    const title = c.name || (c.handle ? '@' + c.handle : (c.email || 'Client'));
+    const title = clientLabel(c);
     return `
     <article class="card tappable" data-key="${key}" data-kind="client" role="button" tabindex="0" aria-label="Open ${escAttr(title)}">
         <div class="card-row">
             ${avatarHtml(title, c.instagram)}
             <div class="card-main">
-                <div class="card-title">${c.urgent ? icon('flame', 'flame') : ''}${escapeHtml(title)}</div>
+                <div class="card-title">${blipHtml(c, 'data-stop')}${escapeHtml(title)}</div>
                 <div class="card-sub">
                     <span class="pill" style="${statusPillStyle(c.status)}">${escapeHtml(c.status)}</span>
                     ${c._s.orderCount ? `<span>${c._s.orderCount} order${c._s.orderCount === 1 ? '' : 's'}</span><span class="sep">·</span><span class="money">${money(c._s.totalSpent)}</span>` : (src ? `<span class="muted">${escapeHtml(src)}</span>` : '')}
+                    ${c.hasActiveOrder ? '<span class="pill pill-in_progress">In progress</span>' : ''}
                     ${chan ? `<span class="pill pill-chan">${escapeHtml(chan)}</span>` : ''}
                 </div>
                 ${c.notes ? `<div class="card-note">${icon('note')}<span>${escapeHtml(truncate(c.notes, 90))}</span></div>` : ''}
@@ -1071,21 +1148,19 @@ function renderClientDetail() {
         return;
     }
     S.dirty = false;
-    const title = c.name || (c.handle ? '@' + c.handle : (c.email || 'Client'));
+    const title = clientLabel(c);
     $('cdTitle').textContent = title;
     const stats = clientStats(c);
     const ig = instagramUrl(c.instagram);
     const src = SOURCE_LABEL[c.source] || '';
 
-    const orderItems = S.orders
-        .filter((o) => o.clientId === c.firebaseKey && !isTestOrder(o))
-        .sort((a, b) => orderTs(b) - orderTs(a));
+    const orderItems = clientOrders(c).sort((a, b) => orderTs(b) - orderTs(a));
 
     $('cdBody').innerHTML = `
         <div class="profile-row">
             ${avatarHtml(title, c.instagram)}
             <div class="profile-row-main">
-                <div class="profile-row-name">${c.urgent ? icon('flame', 'flame') : ''}${escapeHtml(title)}</div>
+                <div class="profile-row-name">${hasBlip(c) ? `<span class="blip${c.urgent ? ' blip-manual' : ''}" title="${c.urgent ? 'Flagged' : 'Order in progress'}"></span>` : ''}${escapeHtml(title)}</div>
                 <div class="profile-row-sub">${ig ? `<a href="${ig}" target="_blank" rel="noopener noreferrer">${escapeHtml(instagramDisplay(c.instagram))}</a>` : 'No Instagram linked'}${src ? ` · <span class="muted">${escapeHtml(src)}</span>` : ''}</div>
             </div>
         </div>
@@ -1118,9 +1193,13 @@ function renderClientDetail() {
                 ${c.slug ? ` · <a href="https://campaigns.upscalemarketingsolutions.com/c/${encodeURIComponent(c.slug)}" target="_blank" rel="noopener noreferrer">open</a>` : ''}</small>
             </label>
             <div class="check-row">
-                <label class="check ${c.urgent ? 'checked' : ''}"><input type="checkbox" id="cdHot" ${c.urgent ? 'checked' : ''}><span class="check-box">${icon('check')}</span>Hot / urgent</label>
+                <label class="check ${c.urgent ? 'checked' : ''}"><input type="checkbox" id="cdHot" ${c.urgent ? 'checked' : ''}><span class="check-box">${icon('check')}</span>Red blip</label>
             </div>
             <label class="field"><span>Notes <span class="muted" style="font-weight:500">· shared with CRM</span></span><textarea id="cdNotes" rows="6">${escapeHtml(c.notes || '')}</textarea></label>
+        </div>
+        <div class="detail-section">
+            <h3>Duplicates</h3>
+            <button type="button" class="btn btn-ghost btn-block" id="cdMerge">Merge this client into another…</button>
         </div>
         <div class="detail-section">
             <h3>Orders (${orderItems.length})</h3>
@@ -1130,8 +1209,9 @@ function renderClientDetail() {
                 <div class="mini-row">
                     <div class="mini-row-main">
                         <div class="mini-row-title">${money(o.amount)}</div>
-                        <div class="mini-row-sub"><span class="pill pill-${escAttr(o.serviceStatus || 'pending')}">${statusLabel(o.serviceStatus || 'pending')}</span> · ${escapeHtml(relTime(orderTs(o)))}</div>
+                        <div class="mini-row-sub"><span class="pill pill-${escAttr(o.serviceStatus || 'pending')}">${statusLabel(o.serviceStatus || 'pending')}</span> · ${escapeHtml(relTime(orderTs(o)))}${(o.viewsStart != null && o.viewsEnd != null) ? ` · +${Math.max(0, Number(o.viewsEnd) - Number(o.viewsStart)).toLocaleString()} views` : ''}</div>
                     </div>
+                    ${safeUrl(o.youtubeLink) ? `<a class="ibtn ibtn-yt" href="${safeUrl(o.youtubeLink)}" target="_blank" rel="noopener noreferrer" title="Open YouTube video" aria-label="Open YouTube video">${icon('play')}</a>` : ''}
                     <button class="ibtn" data-edit-order="${escAttr(o.firebaseKey)}" title="Edit order" aria-label="Edit order">${icon('edit')}</button>
                 </div>`).join('')}
             </div>
@@ -1151,6 +1231,7 @@ function renderClientDetail() {
     });
     document.querySelectorAll('[data-edit-order]').forEach((b) =>
         b.addEventListener('click', () => openOrderSheet(b.dataset.editOrder)));
+    $('cdMerge').addEventListener('click', openMergeSheet);
 }
 
 async function saveClientDetail() {
@@ -1203,6 +1284,58 @@ async function saveClientDetail() {
     toast('Client saved', 'success');
     await loadClientsFromApi();
     renderClientDetail();
+}
+
+// Fold this client into another one: the target inherits every order (and all
+// revenue/history) and this duplicate disappears.
+function openMergeSheet() {
+    const src = S.clients.find((x) => x.firebaseKey === S.route.id);
+    if (!src) return;
+    const stats = clientStats(src);
+    const body = `
+    <div class="form">
+        <div class="field"><span>Merging away</span>
+            <div class="readout">${escapeHtml(clientLabel(src))}${stats.orderCount ? ` · ${stats.orderCount} order${stats.orderCount === 1 ? '' : 's'} · ${money(stats.totalSpent)}` : ''}</div>
+        </div>
+        <div class="field"><span>Into this client</span>
+            <input type="search" id="mgSearch" placeholder="Search by name, @handle or email…" autocomplete="off"
+                style="width:100%;min-height:44px;padding:10px 14px;font-size:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);outline:none;">
+            <div class="picker-results" id="mgResults"></div>
+        </div>
+        <small class="muted" style="color:var(--text-3);font-size:12.5px;">Every order, note and highlight moves to the client you pick. This one is then deleted. Can't be undone.</small>
+    </div>`;
+    openSheet('Merge client', body, '<div class="footer-gap"></div><button class="btn btn-ghost" data-sheet-close>Cancel</button>');
+
+    const draw = (q) => {
+        const term = (q || '').toLowerCase().trim();
+        const matches = S.clients
+            .filter((c) => c.firebaseKey !== src.firebaseKey)
+            .filter((c) => !term || clientLabel(c).toLowerCase().includes(term) || c.handle.toLowerCase().includes(term) || c.email.toLowerCase().includes(term))
+            .slice(0, 8);
+        $('mgResults').innerHTML = matches.length
+            ? matches.map((c) => `<button type="button" class="picker-row" data-tid="${escAttr(c.firebaseKey)}"><strong>${escapeHtml(clientLabel(c))}</strong><small>${escapeHtml([c.handle ? '@' + c.handle : '', c.email, c.orderCount ? c.orderCount + ' orders' : ''].filter(Boolean).join(' · '))}</small></button>`).join('')
+            : '<div class="empty-inline">No other clients match.</div>';
+        $('mgResults').querySelectorAll('[data-tid]').forEach((row) => row.addEventListener('click', () => {
+            const tgt = S.clients.find((x) => x.firebaseKey === row.dataset.tid);
+            if (!tgt) return;
+            openConfirm('Merge clients?',
+                `<p>Move everything from <strong>${escapeHtml(clientLabel(src))}</strong> into <strong>${escapeHtml(clientLabel(tgt))}</strong>?</p>
+                 <p>${stats.orderCount} order${stats.orderCount === 1 ? '' : 's'} and ${money(stats.totalSpent)} will move across. The duplicate is deleted.</p>`,
+                async () => {
+                    closeConfirm();
+                    closeSheet();
+                    S.dirty = false;
+                    try {
+                        const out = await crmApi('POST', { action: 'merge', sourceKey: src.firebaseKey, targetKey: tgt.firebaseKey });
+                        toast(`Merged · ${out.movedOrders || 0} order${out.movedOrders === 1 ? '' : 's'} moved`, 'success');
+                        await loadClientsFromApi();
+                        navigate(`client/${tgt.firebaseKey}`);
+                    } catch (err) { console.error(err); toast(err.message || 'Merge failed', 'error'); }
+                });
+        }));
+    };
+    $('mgSearch').addEventListener('input', (e) => draw(e.target.value));
+    draw('');
 }
 
 function deleteClientFromDetail() {
@@ -1603,6 +1736,11 @@ function wire() {
     document.querySelectorAll('.tab').forEach((t) =>
         t.addEventListener('click', () => navigate(t.dataset.nav)));
 
+    // Coming back to the tab should show whatever the CRM changed meanwhile.
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && S.user && !S.dirty) loadClientsFromApi({ silent: true });
+    });
+
     // Routing
     window.addEventListener('hashchange', applyRoute);
     window.addEventListener('popstate', () => {
@@ -1664,6 +1802,7 @@ function wire() {
         const card = e.target.closest('.card');
         if (!card) return;
         const key = card.dataset.key;
+        if (e.target.closest('[data-blip]')) return toggleUrgent(key);
         if (e.target.closest('[data-action="orders"]')) {
             const c = S.clients.find((x) => x.firebaseKey === key);
             if (!c) return;
