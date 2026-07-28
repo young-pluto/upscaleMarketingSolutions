@@ -528,19 +528,39 @@ class ClientOS {
             .sort((a, b) => b.at - a.at);
     }
 
+    // "Leads" covers both kinds: clients you added here whose status is Lead, and
+    // trial-campaign submissions (a separate node). They used to be conflated, so
+    // a CRM lead like @mxlo4nn never appeared in this list.
+    leadClients() {
+        const q = this.state.query.trim().toLowerCase();
+        return this.state.clients
+            .filter((c) => !c.archived && c.status === 'Lead')
+            .filter((c) => !q || clientTitle(c).toLowerCase().includes(q) || c.niche.toLowerCase().includes(q) || c.note.toLowerCase().includes(q))
+            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    }
+
     renderLeadList() {
+        const clientLeads = this.leadClients();
         const rows = this.visibleLeads();
-        const total = (this.state.leads || []).length;
-        this.dom.count.textContent = rows.length === total ? `${total} leads` : `${rows.length} of ${total}`;
+        const total = clientLeads.length + (this.state.leads || []).length;
+        this.dom.count.textContent = `${clientLeads.length + rows.length} of ${total} leads`;
         const list = this.dom.list;
         list.textContent = '';
-        if (!rows.length) {
+        if (!clientLeads.length && !rows.length) {
             list.appendChild(h('div', { class: 'empty' }, [
-                h('div', { class: 'title', text: 'No trial leads' }),
-                h('div', { class: 'sub', text: 'Trial campaign submissions show up here with their status.' })
+                h('div', { class: 'title', text: 'No leads' }),
+                h('div', { class: 'sub', text: 'Clients with the Lead status and trial-campaign submissions both show up here.' })
             ]));
             return;
         }
+        // CRM leads first — these are real client records, fully tappable.
+        if (clientLeads.length) {
+            list.appendChild(h('div', { class: 'lead-section', text: 'In CRM' }));
+            const cf = document.createDocumentFragment();
+            for (const c of clientLeads) cf.appendChild(this.renderRow(c));
+            list.appendChild(cf);
+        }
+        if (rows.length) list.appendChild(h('div', { class: 'lead-section', text: 'Trial campaign submissions' }));
         const frag = document.createDocumentFragment();
         for (const l of rows) {
             const color = LEAD_COLOR[l.status] || 'var(--t3)';

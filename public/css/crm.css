@@ -269,6 +269,16 @@ body {
     50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--red) 6%, transparent); }
 }
 
+/* section label inside the Leads list (CRM leads vs trial submissions) */
+.lead-section {
+    padding: 14px 16px 6px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--t3);
+}
+
 .pill.in-progress-pill { color: var(--red); background: color-mix(in srgb, var(--red) 14%, transparent); font-weight: 590; }
 .pill.order-pill { color: var(--t2); background: var(--elev2); font-variant-numeric: tabular-nums; }
 

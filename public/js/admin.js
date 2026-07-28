@@ -902,16 +902,18 @@ function openOrderSheet(firebaseKey) {
 
     const drawResults = (q) => {
         const term = (q || '').trim();
-        // Sort so the most-used clients surface first when the box is empty.
+        // Nothing typed → nothing listed. Dumping every client just buries the one
+        // you're after.
+        if (!term) { $('fClientResults').innerHTML = ''; return; }
         const matches = S.clients
             .filter((c) => clientMatches(c, term))
             .sort((a, b) => (b.orderCount - a.orderCount) || clientLabel(a).localeCompare(clientLabel(b)))
-            .slice(0, 12);
+            .slice(0, 8);
         $('fClientResults').innerHTML =
             matches.map((c) => `<button type="button" class="picker-row" data-cid="${escAttr(c.firebaseKey)}"><strong>${escapeHtml(clientLabel(c))}</strong><small>${escapeHtml([c.handle ? '@' + c.handle : '', c.email, c.orderCount ? c.orderCount + ' orders' : ''].filter(Boolean).join(' · '))}</small></button>`).join('')
-            + (term && !matches.length ? `<div class="empty-inline">No client matches “${escapeHtml(term)}”.</div>` : '')
+            + (matches.length ? '' : `<div class="empty-inline">No client matches “${escapeHtml(term)}”.</div>`)
             // "Create" goes last so it never crowds out the real matches.
-            + (term ? `<button type="button" class="picker-row picker-row-new" data-new>${icon('plus')} Create “${escapeHtml(term)}”</button>` : '');
+            + `<button type="button" class="picker-row picker-row-new" data-new>${icon('plus')} Create “${escapeHtml(term)}”</button>`;
         $('fClientResults').querySelectorAll('[data-cid]').forEach((row) => row.addEventListener('click', () => {
             const c = S.clients.find((x) => x.firebaseKey === row.dataset.cid);
             if (!c) return;
@@ -933,7 +935,6 @@ function openOrderSheet(firebaseKey) {
     };
     $('fClientSearch').addEventListener('input', (e) => drawResults(e.target.value));
     $('fClientSearch').addEventListener('focus', (e) => drawResults(e.target.value));
-    drawResults('');   // show pickable clients straight away, before any typing
 
     // ---- save ----
     $('fSave').addEventListener('click', async () => {
@@ -1334,15 +1335,16 @@ function openMergeSheet() {
     openSheet('Merge client', body, '<div class="footer-gap"></div><button class="btn btn-ghost" data-sheet-close>Cancel</button>');
 
     const draw = (q) => {
-        const term = (q || '').toLowerCase().trim();
+        const term = (q || '').trim();
+        if (!term) { $('mgResults').innerHTML = ''; return; }
         const matches = S.clients
             .filter((c) => c.firebaseKey !== src.firebaseKey)
             .filter((c) => clientMatches(c, term))
             .sort((a, b) => (b.orderCount - a.orderCount) || clientLabel(a).localeCompare(clientLabel(b)))
-            .slice(0, 12);
+            .slice(0, 8);
         $('mgResults').innerHTML = matches.length
             ? matches.map((c) => `<button type="button" class="picker-row" data-tid="${escAttr(c.firebaseKey)}"><strong>${escapeHtml(clientLabel(c))}</strong><small>${escapeHtml([c.handle ? '@' + c.handle : '', c.email, c.orderCount ? c.orderCount + ' orders' : ''].filter(Boolean).join(' · '))}</small></button>`).join('')
-            : '<div class="empty-inline">No other clients match.</div>';
+            : `<div class="empty-inline">No client matches “${escapeHtml(term)}”.</div>`;
         $('mgResults').querySelectorAll('[data-tid]').forEach((row) => row.addEventListener('click', () => {
             const tgt = S.clients.find((x) => x.firebaseKey === row.dataset.tid);
             if (!tgt) return;
