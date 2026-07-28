@@ -335,15 +335,26 @@ function clientLabel(c) {
     return c.name || (c.handle ? '@' + c.handle : '') || c.email || c.phone || 'Client';
 }
 
-// The red blip: a manual "needs attention" flag OR an order still in progress.
-function hasBlip(c) { return !!(c && (c.urgent || c.hasActiveOrder)); }
+// Forgiving search: strip everything that isn't a letter/number so "@2rawtunee",
+// "2 raw tunee" and "2rawtunee" all match the same client.
+function squash(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+function clientHaystack(c) { return squash([c.name, c.handle, c.email, c.phone, c.slug].join(' ')); }
+function clientMatches(c, term) {
+    const t = squash(term);
+    if (!t) return true;
+    if (clientHaystack(c).includes(t)) return true;
+    // also match plain-text terms verbatim (e.g. an email with dots)
+    return [c.name, c.handle, c.email, c.slug].some((f) => String(f || '').toLowerCase().includes(String(term).toLowerCase().trim()));
+}
+
+// The red blip is ONE manual flag (`urgent`) and nothing else, so tapping it off
+// always turns it off. An order moving to "in progress" switches it on for you,
+// but from then on it's yours to clear.
+function hasBlip(c) { return !!(c && c.urgent); }
 function blipHtml(c, extra = '') {
     if (!hasBlip(c)) return '';
-    const why = c.urgent
-        ? (c.hasActiveOrder ? 'Flagged + order in progress' : 'Flagged')
-        : 'Order in progress';
-    return `<button type="button" class="blip${c.urgent ? ' blip-manual' : ''}" data-blip ${extra}
-        title="${why}. Tap to toggle the flag." aria-label="${why}"></button>`;
+    return `<button type="button" class="blip blip-manual" data-blip ${extra}
+        title="Flagged — tap to clear" aria-label="Flagged, tap to clear"></button>`;
 }
 
 function statusPillStyle(status) {
@@ -890,13 +901,17 @@ function openOrderSheet(firebaseKey) {
     drawCurrent();
 
     const drawResults = (q) => {
-        const term = (q || '').toLowerCase().trim();
+        const term = (q || '').trim();
+        // Sort so the most-used clients surface first when the box is empty.
         const matches = S.clients
-            .filter((c) => !term || c.name.toLowerCase().includes(term) || c.handle.toLowerCase().includes(term) || c.email.toLowerCase().includes(term) || (c.slug || '').includes(term))
-            .slice(0, 6);
+            .filter((c) => clientMatches(c, term))
+            .sort((a, b) => (b.orderCount - a.orderCount) || clientLabel(a).localeCompare(clientLabel(b)))
+            .slice(0, 12);
         $('fClientResults').innerHTML =
-            (term ? `<button type="button" class="picker-row picker-row-new" data-new>${icon('plus')} Create “${escapeHtml(q)}”</button>` : '')
-            + matches.map((c) => `<button type="button" class="picker-row" data-cid="${escAttr(c.firebaseKey)}"><strong>${escapeHtml(clientLabel(c))}</strong><small>${escapeHtml([c.handle ? '@' + c.handle : '', c.email, c.orderCount ? c.orderCount + ' orders' : ''].filter(Boolean).join(' · '))}</small></button>`).join('');
+            matches.map((c) => `<button type="button" class="picker-row" data-cid="${escAttr(c.firebaseKey)}"><strong>${escapeHtml(clientLabel(c))}</strong><small>${escapeHtml([c.handle ? '@' + c.handle : '', c.email, c.orderCount ? c.orderCount + ' orders' : ''].filter(Boolean).join(' · '))}</small></button>`).join('')
+            + (term && !matches.length ? `<div class="empty-inline">No client matches “${escapeHtml(term)}”.</div>` : '')
+            // "Create" goes last so it never crowds out the real matches.
+            + (term ? `<button type="button" class="picker-row picker-row-new" data-new>${icon('plus')} Create “${escapeHtml(term)}”</button>` : '');
         $('fClientResults').querySelectorAll('[data-cid]').forEach((row) => row.addEventListener('click', () => {
             const c = S.clients.find((x) => x.firebaseKey === row.dataset.cid);
             if (!c) return;
@@ -918,6 +933,7 @@ function openOrderSheet(firebaseKey) {
     };
     $('fClientSearch').addEventListener('input', (e) => drawResults(e.target.value));
     $('fClientSearch').addEventListener('focus', (e) => drawResults(e.target.value));
+    drawResults('');   // show pickable clients straight away, before any typing
 
     // ---- save ----
     $('fSave').addEventListener('click', async () => {
@@ -941,8 +957,14 @@ function openOrderSheet(firebaseKey) {
             clientSlug: selClient ? selClient.slug : null,
             updatedAt: Date.now(),
         }, 'Order saved');
-        // Re-read clients so the order (and the revenue/blip rollups) land on the
-        // client record — the server projects orders onto their owner on read.
+        // Moving an order INTO "in progress" raises the client's blip once, as a
+        // nudge. It's a plain flag from then on, so you can clear it and it stays
+        // cleared (we only set it on the transition, never on every read).
+        if (selClient && finalStatus === 'in_progress' && status !== 'in_progress') {
+            try { await crmApi('PATCH', { firebaseKey: selClient.id, updates: { urgent: true } }); } catch (e) { console.error(e); }
+        }
+        // Re-read clients so the order (and the revenue rollups) land on the client
+        // record — the server projects orders onto their owner on read.
         await loadClientsFromApi();
     });
 
@@ -1160,7 +1182,7 @@ function renderClientDetail() {
         <div class="profile-row">
             ${avatarHtml(title, c.instagram)}
             <div class="profile-row-main">
-                <div class="profile-row-name">${hasBlip(c) ? `<span class="blip${c.urgent ? ' blip-manual' : ''}" title="${c.urgent ? 'Flagged' : 'Order in progress'}"></span>` : ''}${escapeHtml(title)}</div>
+                <div class="profile-row-name">${hasBlip(c) ? '<span class="blip blip-manual" title="Flagged"></span>' : ''}${escapeHtml(title)}</div>
                 <div class="profile-row-sub">${ig ? `<a href="${ig}" target="_blank" rel="noopener noreferrer">${escapeHtml(instagramDisplay(c.instagram))}</a>` : 'No Instagram linked'}${src ? ` · <span class="muted">${escapeHtml(src)}</span>` : ''}</div>
             </div>
         </div>
@@ -1219,6 +1241,11 @@ function renderClientDetail() {
 
     bindSeg('cdStatus', c.status, () => { S.dirty = true; });
     bindActivitySeg('cdAct', activityOf(c), () => { S.dirty = true; });
+    // Custom checkboxes only get their visual wiring inside sheets; detail views
+    // render straight into the page, so bind them here too (this is why the
+    // "Red blip" checkbox looked dead).
+    $('cdBody').querySelectorAll('.check input').forEach((input) =>
+        input.addEventListener('change', () => input.closest('.check').classList.toggle('checked', input.checked)));
     $('cdToday').addEventListener('click', () => { $('cdContact').value = todayDateInput(); S.dirty = true; });
     ['cdName', 'cdSlug', 'cdIg', 'cdEmail', 'cdPhone', 'cdChannel', 'cdNotes', 'cdFollow', 'cdContact', 'cdHot'].forEach((id) => {
         const el = $(id);
@@ -1310,8 +1337,9 @@ function openMergeSheet() {
         const term = (q || '').toLowerCase().trim();
         const matches = S.clients
             .filter((c) => c.firebaseKey !== src.firebaseKey)
-            .filter((c) => !term || clientLabel(c).toLowerCase().includes(term) || c.handle.toLowerCase().includes(term) || c.email.toLowerCase().includes(term))
-            .slice(0, 8);
+            .filter((c) => clientMatches(c, term))
+            .sort((a, b) => (b.orderCount - a.orderCount) || clientLabel(a).localeCompare(clientLabel(b)))
+            .slice(0, 12);
         $('mgResults').innerHTML = matches.length
             ? matches.map((c) => `<button type="button" class="picker-row" data-tid="${escAttr(c.firebaseKey)}"><strong>${escapeHtml(clientLabel(c))}</strong><small>${escapeHtml([c.handle ? '@' + c.handle : '', c.email, c.orderCount ? c.orderCount + ' orders' : ''].filter(Boolean).join(' · '))}</small></button>`).join('')
             : '<div class="empty-inline">No other clients match.</div>';

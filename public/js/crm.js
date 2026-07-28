@@ -200,8 +200,10 @@ function moneyShort(n) {
     return '$' + Math.round(v);
 }
 
-// The red blip: a manual "needs attention" flag OR an order still in progress.
-function hasBlip(c) { return !!(c && (c.urgent || c.hasActiveOrder)); }
+// The red blip is ONE manual flag (`urgent`) and nothing else, so tapping it off
+// always turns it off. An in-progress order switches it on for you in the admin,
+// but from then on it's yours to clear.
+function hasBlip(c) { return !!(c && c.urgent); }
 
 function ago(ms) {
     if (!ms) return '—';
@@ -665,15 +667,15 @@ class ClientOS {
         this.toast(ch ? 'Opening @' + c.handle + ' · reply from @' + ch.name : 'Opening @' + c.handle);
     }
 
-    // Tappable red blip — toggles the manual flag; also lit by an in-progress order.
+    // Tappable red blip — one manual flag, so tapping always clears it.
     blipEl(c) {
         if (!hasBlip(c)) return null;
         return h('button', {
-            class: 'blip' + (c.urgent ? ' blip-manual' : ''),
-            title: c.urgent ? 'Flagged — tap to clear' : 'Order in progress — tap to flag',
+            class: 'blip blip-manual',
+            title: 'Flagged — tap to clear',
             onclick: (e) => {
                 e.stopPropagation();
-                this.patch(c.id, { urgent: !c.urgent }, { toast: c.urgent ? 'Blip cleared' : 'Blip on' });
+                this.patch(c.id, { urgent: false }, { toast: 'Blip cleared' });
             }
         });
     }

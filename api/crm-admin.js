@@ -174,8 +174,9 @@ function normalizeUpdates(updates, user) {
 // Orders before this are test data (mirrors admin.js TEST_ORDER_CUTOFF_MS).
 const TEST_ORDER_CUTOFF_MS = Date.parse('2025-09-06T00:00:00Z');
 
-// An order is "active" (work outstanding) until it's completed or cancelled.
-const ACTIVE_ORDER_STATUSES = ['pending', 'in_progress'];
+// "Active" means work is actually underway. Deliberately NOT 'pending' — almost
+// every paid order sits at pending, so counting it made the indicator meaningless.
+const ACTIVE_ORDER_STATUSES = ['in_progress'];
 
 function orderTs(o) {
     return Number(o.createdAt) || (o.timestamp ? Date.parse(o.timestamp) : 0) || 0;
