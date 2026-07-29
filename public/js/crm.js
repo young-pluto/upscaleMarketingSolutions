@@ -122,6 +122,11 @@ function normalizeClient(c) {
         email: c.email || '',
         phone: c.phone || '',
         source: c.source || 'manual',
+        // Same record, same operations — `kind` is what keeps leads and clients
+        // visually apart. Derived for records written before the field existed.
+        kind: c.kind === 'lead' || c.kind === 'client'
+            ? c.kind
+            : ((c.source === 'trial' || c.status === 'Lead') ? 'lead' : 'client'),
         // Trial-campaign facts, mirrored onto the client (server-projected).
         trial: c.trial || null,
         trialKey: c.trialKey || '',
@@ -547,9 +552,7 @@ class ClientOS {
     leadClients() {
         const q = this.state.query.trim().toLowerCase();
         return this.state.clients
-            // Lead-status clients plus anything that came in from a trial campaign,
-            // whatever status it has now.
-            .filter((c) => !c.archived && (c.status === 'Lead' || c.source === 'trial'))
+            .filter((c) => !c.archived && c.kind === 'lead')
             .filter((c) => !q || clientTitle(c).toLowerCase().includes(q) || c.niche.toLowerCase().includes(q) || c.note.toLowerCase().includes(q))
             .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     }
@@ -612,6 +615,8 @@ class ClientOS {
         let list = s.clients.filter((c) => {
             // Archived clients are hidden everywhere except the Archived chip.
             if (!!c.archived !== showArchived) return false;
+            // Leads never appear in the client list — they have their own Leads chip.
+            if (c.kind === 'lead') return false;
             if (statusF.length && !statusF.includes(c.status)) return false;
             if (channelF.length && !channelF.includes(c.channel)) return false;
             if (metaF.includes('today') && !isActionable(c)) return false;
@@ -641,7 +646,8 @@ class ClientOS {
     }
 
     renderCount(rows = this.visibleClients()) {
-        const total = this.state.clients.filter((c) => !c.archived).length;
+        // Count clients only — leads are counted on the Leads chip.
+        const total = this.state.clients.filter((c) => !c.archived && c.kind !== 'lead').length;
         this.dom.count.textContent = this.state.filters.length ? `${rows.length} of ${total}` : `${total} clients`;
     }
 
@@ -832,6 +838,22 @@ class ClientOS {
         ]));
         const subBits = [c.niche, c.name && c.handle ? c.name : '', c.email].filter(Boolean).join(' · ');
         if (subBits) body.appendChild(h('div', { class: 'd-niche', text: subBits }));
+
+        // Lead ⇄ Client. Same record and same operations either way; this only
+        // decides which list they live in. Always a deliberate choice.
+        body.appendChild(h('div', { class: 'kind-row' }, [
+            h('span', { class: 'label', text: c.kind === 'lead' ? 'Lead' : 'Client' }),
+            h('button', {
+                class: 'kind-switch',
+                onclick: () => {
+                    const next = c.kind === 'lead' ? 'client' : 'lead';
+                    this.patch(c.id, {
+                        kind: next,
+                        history: this.withHistory(c, next === 'client' ? 'Converted to client' : 'Moved back to leads')
+                    }, { toast: next === 'client' ? 'Now a client' : 'Now a lead' });
+                }
+            }, c.kind === 'lead' ? 'Convert to client' : 'Move to leads')
+        ]));
 
         // status + channel + meta
         const statusBtn = h('button', {

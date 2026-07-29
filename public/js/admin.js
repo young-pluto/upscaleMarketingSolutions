@@ -35,7 +35,11 @@ const ACTIVITY_LABEL = { active: 'Active', neutral: 'Neutral', dormant: 'Dormant
 // client record lives in crm/clients and both apps read/write it.
 const CRM_STATUSES = ['Lead', 'Warm', 'Active', 'Client', 'VIP', 'Stale', 'Dead'];
 // Segments for the one unified Clients list (see renderClients).
+// `clients` and `leads` are the same record type with the same operations — the
+// `kind` field just keeps them in separate lists.
 const CLIENT_SEGMENTS = [
+    { key: 'clients', label: 'Clients' },
+    { key: 'leads', label: 'Leads' },
     { key: 'all', label: 'All' },
     { key: 'hasOrders', label: 'Has orders' },
     { key: 'order', label: 'From order' },
@@ -62,7 +66,7 @@ const S = {
     route: { view: 'orders', id: null },
     ui: {
         orders: { tab: 'pending', search: '', sort: 'newest', stats: false, test: false, clientFilter: null, shown: PAGE_SIZE, expanded: null },
-        clients: { tab: 'all', search: '', sort: 'recent' },
+        clients: { tab: 'clients', search: '', sort: 'recent' },
         leads: { tab: 'new', activity: 'all', search: '', genre: '', sort: 'newest', stats: false, shown: PAGE_SIZE },
         old: { tab: 'hot', search: '', channel: '', sort: 'oldest' },
         channels: { search: '' },
@@ -317,6 +321,11 @@ function normClient(r) {
         followUpHasTime: !!r.followUpHasTime,
         lastContactedAt: r.lastContactedAt || null,
         source: r.source || 'manual',
+        kind: r.kind === 'lead' || r.kind === 'client'
+            ? r.kind
+            : ((r.source === 'trial' || r.status === 'Lead') ? 'lead' : 'client'),
+        trial: r.trial || null,
+        youtubeLink: r.youtubeLink || '',
         // Orders + rollups live on the client record itself (server-projected).
         orders: r.orders || {},
         orderCount: Number(r.orderCount || 0),
@@ -1013,6 +1022,8 @@ function openOrderSheet(firebaseKey) {
 
 function matchesSegment(c, seg) {
     switch (seg) {
+        case 'clients': return c.kind !== 'lead';
+        case 'leads': return c.kind === 'lead';
         case 'hasOrders': return clientStats(c).orderCount > 0;
         case 'order': return c.source === 'order';
         case 'legacy': return c.source === 'legacy';
@@ -1069,6 +1080,7 @@ function clientCardHtml(c) {
             <div class="card-main">
                 <div class="card-title">${blipHtml(c, 'data-stop')}${escapeHtml(title)}</div>
                 <div class="card-sub">
+                    ${c.kind === 'lead' ? '<span class="pill pill-lead">Lead</span>' : ''}
                     <span class="pill" style="${statusPillStyle(c.status)}">${escapeHtml(c.status)}</span>
                     ${c._s.orderCount ? `<span>${c._s.orderCount} order${c._s.orderCount === 1 ? '' : 's'}</span><span class="sep">·</span><span class="money">${money(c._s.totalSpent)}</span>` : (src ? `<span class="muted">${escapeHtml(src)}</span>` : '')}
                     ${c.hasActiveOrder ? '<span class="pill pill-in_progress">In progress</span>' : ''}
@@ -1221,6 +1233,13 @@ function renderClientDetail() {
             <div class="stat"><span class="stat-label">Last contacted</span><span class="stat-value">${escapeHtml(contactAgo(c.lastContactedAt))}</span></div>
         </div>
         <div class="form">
+            <div class="field"><span>Record type</span>
+                <div class="segmented" id="cdKind">
+                    <button type="button" class="seg ${c.kind !== 'lead' ? 'active' : ''}" data-value="client">Client</button>
+                    <button type="button" class="seg ${c.kind === 'lead' ? 'active' : ''}" data-value="lead">Lead</button>
+                </div>
+                <small>Same fields and actions either way — this only decides which list they show up in.</small>
+            </div>
             <div class="field"><span>Status</span>${statusSegHtml(c.status, 'cdStatus')}</div>
             <div class="field"><span>Category</span>${activitySegHtml(activityOf(c), 'cdAct')}</div>
             <label class="field"><span>Name</span><input type="text" id="cdName" value="${escAttr(c.name || '')}"></label>
@@ -1267,6 +1286,7 @@ function renderClientDetail() {
             </div>
         </div>`;
 
+    bindSeg('cdKind', c.kind, () => { S.dirty = true; });
     bindSeg('cdStatus', c.status, () => { S.dirty = true; });
     bindActivitySeg('cdAct', activityOf(c), () => { S.dirty = true; });
     // Custom checkboxes only get their visual wiring inside sheets; detail views
@@ -1301,6 +1321,7 @@ async function saveClientDetail() {
         slug = await uniqueSlug(slug, c.firebaseKey);
     }
     const status = document.querySelector('#cdStatus .seg.active')?.dataset.value || c.status;
+    const kind = document.querySelector('#cdKind .seg.active')?.dataset.value || c.kind;
     const act = document.querySelector('#cdAct .seg.active')?.dataset.value || activityOf(c);
     const followUpAt = msFromDateInput($('cdFollow').value);
 
@@ -1311,7 +1332,7 @@ async function saveClientDetail() {
                 name, slug, handle, email,
                 phone: $('cdPhone').value.trim(),
                 channel: $('cdChannel').value || '',
-                status, activity: act,
+                status, kind, activity: act,
                 urgent: $('cdHot').checked,
                 note: $('cdNotes').value,
                 followUpAt,

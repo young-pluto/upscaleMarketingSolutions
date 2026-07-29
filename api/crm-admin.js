@@ -43,7 +43,17 @@ function normalizePhone(value) {
 }
 
 const ACTIVITIES = ['active', 'neutral', 'dormant'];
-const SOURCES = ['manual', 'crm', 'legacy', 'usm', 'order', 'lead-outreach'];
+const SOURCES = ['manual', 'crm', 'legacy', 'usm', 'order', 'trial', 'lead-outreach'];
+
+// Leads and clients are the same record with the same operations; `kind` is the
+// one field that keeps them apart in the UI. Derived for records written before
+// this field existed. (Converting a lead is a deliberate flip of this field —
+// nothing auto-converts.)
+const KINDS = ['lead', 'client'];
+function deriveKind(c) {
+    if (KINDS.includes(c.kind)) return c.kind;
+    return (c.source === 'trial' || c.status === 'Lead') ? 'lead' : 'client';
+}
 
 function clampStatus(value) {
     return STATUSES.includes(value) ? value : 'Lead';
@@ -137,6 +147,9 @@ function normalizeUpdates(updates, user) {
     }
     if (Object.prototype.hasOwnProperty.call(updates, 'source')) {
         normalized.source = SOURCES.includes(updates.source) ? updates.source : 'manual';
+    }
+    if (Object.prototype.hasOwnProperty.call(updates, 'kind')) {
+        normalized.kind = KINDS.includes(updates.kind) ? updates.kind : 'client';
     }
     if (Object.prototype.hasOwnProperty.call(updates, 'status')) {
         normalized.status = clampStatus(updates.status);
@@ -276,6 +289,7 @@ async function handleGet(database, res) {
         const merged = {
             ...c,
             ...trialLive,
+            kind: deriveKind(c),
             orders: p.orders,
             orderCount: p.orderCount,
             revenue: p.revenue,
@@ -425,6 +439,7 @@ async function handlePost(database, req, res, user) {
         niche: sanitizeString(data.niche, 120),
         channel: sanitizeString(data.channel, 120),
         status: clampStatus(data.status),
+        kind: KINDS.includes(data.kind) ? data.kind : (clampStatus(data.status) === 'Lead' ? 'lead' : 'client'),
         activity: ACTIVITIES.includes(data.activity) ? data.activity : 'neutral',
         urgent: !!data.urgent,
         note: sanitizeString(data.note, 2000),

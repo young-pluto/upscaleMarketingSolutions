@@ -269,6 +269,31 @@ body {
     50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--red) 6%, transparent); }
 }
 
+/* Lead ⇄ Client switch in the detail sheet */
+.kind-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 9px 12px;
+    background: var(--elev);
+    border-radius: 10px;
+}
+.kind-row .label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--t3); }
+.kind-switch {
+    padding: 5px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--line2);
+    background: transparent;
+    color: var(--t1);
+    font-size: 12px;
+    font-weight: 560;
+    font-family: inherit;
+    cursor: pointer;
+}
+.kind-switch:active { transform: scale(.97); }
+
 /* section label inside the Leads list (CRM leads vs trial submissions) */
 .lead-section {
     padding: 14px 16px 6px;

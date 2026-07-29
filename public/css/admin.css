@@ -665,6 +665,7 @@ button.blip:active { transform: scale(.85); }
     white-space: nowrap;
 }
 .pill-chan { background: var(--slate-soft); color: var(--slate); }
+.pill-lead { background: color-mix(in srgb, var(--st-Client) 16%, transparent); color: var(--st-Client); }
 .pill-client { background: var(--accent-soft); color: var(--accent-strong); }
 .pill svg { width: 11px; height: 11px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 

@@ -132,6 +132,7 @@ export default async function handler(req, res) {
                     niche: genre || '',
                     channel: '',
                     status: 'Lead',
+                    kind: 'lead',
                     activity: 'neutral',
                     urgent: false,
                     needsReply: false,
