@@ -666,6 +666,12 @@ button.blip:active { transform: scale(.85); }
 }
 .pill-chan { background: var(--slate-soft); color: var(--slate); }
 .pill-client { background: var(--accent-soft); color: var(--accent-strong); }
+.pill svg { width: 11px; height: 11px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Tappable client pill — jumps to their Instagram from the order list */
+a.pill-link { text-decoration: none; cursor: pointer; transition: filter .15s; }
+a.pill-link:hover { text-decoration: none; filter: brightness(1.25); }
+a.pill-link:active { transform: scale(.96); }
 
 /* Status pills — no blue; in_progress = teal (working), new = accent (needs action) */
 .pill-pending { background: var(--amber-soft); color: var(--amber); }

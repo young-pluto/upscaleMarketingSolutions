@@ -777,6 +777,35 @@ function renderOrders() {
     listState($('ordersList'), $('ordersEmpty'), S.loaded.orders, page.map(orderCardHtml).join(''));
 }
 
+// The client an order is assigned to, plus their Instagram URL if we have a handle.
+function orderClient(o) {
+    const client = o.clientId ? S.clients.find((x) => x.firebaseKey === o.clientId) : null;
+    return { client, ig: client ? instagramUrl(client.instagram || client.handle) : '' };
+}
+
+// The assigned-client pill. Tapping it opens their Instagram, so you can jump
+// straight to a client's profile while scrolling the order list.
+function orderClientPill(o) {
+    if (!o.clientId) return '<span class="pill pill-pending">Unassigned</span>';
+    const { client, ig } = orderClient(o);
+    const label = escapeHtml(clientLabel(client) || o.clientName || 'Client');
+    if (!ig) return `<span class="pill pill-client">${label}</span>`;
+    return `<a class="pill pill-client pill-link" href="${ig}" target="_blank" rel="noopener noreferrer" data-stop
+        title="Open ${escAttr(instagramDisplay(client.handle || client.instagram))} on Instagram"
+        aria-label="Open client's Instagram">${icon('instagram')}${label}</a>`;
+}
+
+// Expanded-details version: name, their @handle as an Instagram link, and a way
+// into the client's own page.
+function orderClientDetailHtml(o) {
+    if (!o.clientId) return '<span class="muted">Unassigned</span>';
+    const { client, ig } = orderClient(o);
+    const label = escapeHtml(clientLabel(client) || o.clientName || 'Client');
+    const bits = [`<a href="#/client/${escAttr(o.clientId)}" data-stop>${label}</a>`];
+    if (ig) bits.push(`<a href="${ig}" target="_blank" rel="noopener noreferrer" data-stop>${escapeHtml(instagramDisplay(client.handle || client.instagram))} ↗</a>`);
+    return bits.join(' · ');
+}
+
 function orderCardHtml(o) {
     const key = escAttr(o.firebaseKey);
     const expanded = S.ui.orders.expanded === o.firebaseKey;
@@ -790,9 +819,7 @@ function orderCardHtml(o) {
                     <span class="money">${money(o.amount)}</span>
                     <span class="sep">·</span>
                     <span>${escapeHtml(relTime(orderTs(o)))}</span>
-                    ${o.clientId
-                        ? `<span class="pill pill-client">${escapeHtml(clientLabel(S.clients.find((x) => x.firebaseKey === o.clientId)) || o.clientName || 'Client')}</span>`
-                        : '<span class="pill pill-pending">Unassigned</span>'}
+                    ${orderClientPill(o)}
                 </div>
             </div>
             <div class="card-actions">
@@ -823,7 +850,7 @@ function orderDetailsHtml(o) {
             <dt>Engagement</dt><dd>${o.commentsGiven ? '✓ comments' : '· comments'} &nbsp; ${o.likesGiven ? '✓ likes' : '· likes'}</dd>
             <dt>Order ID</dt><dd><code>${escapeHtml(o.orderID || 'N/A')}</code></dd>
             <dt>PayPal Tx</dt><dd><code>${escapeHtml(o.paypalTransactionId || '—')}</code></dd>
-            <dt>Client</dt><dd>${o.clientName ? escapeHtml(o.clientName) : '<span class="muted">Unassigned</span>'}</dd>
+            <dt>Client</dt><dd>${orderClientDetailHtml(o)}</dd>
             <dt>Notes</dt><dd>${escapeHtml(o.adminNotes || '—')}</dd>
         </dl>
     </div>`;
