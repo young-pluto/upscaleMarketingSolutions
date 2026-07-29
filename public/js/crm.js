@@ -69,6 +69,10 @@ const CHIPS = [
     ['archived', 'Archived']
 ];
 const META_FILTERS = ['today', 'blip', 'inprogress', 'needsReply', 'overdue', 'due', 'cold', 'archived'];
+// Action queues answer "who do I need to deal with", and leads are most of that
+// work — so they're included here. Leads are only held back from the plain
+// browse list (All / status / channel), which is your book of actual clients.
+const ACTION_FILTERS = ['today', 'blip', 'inprogress', 'needsReply', 'overdue', 'due', 'cold', 'archived'];
 
 function readPreference(key, fallback) {
     try { return localStorage.getItem(key) || fallback; } catch (error) { return fallback; }
@@ -259,7 +263,11 @@ function isCold(c) {
 // imported client has an old or empty last-contacted date, so including cold
 // put 38 of 46 clients in here and made the queue meaningless. Cold lives on
 // its own chip for when you want to browse reconnect candidates.
-function isActionable(c) { return c.needsReply || hasBlip(c) || isOverdue(c) || isDueToday(c); }
+// A lead nobody has contacted yet IS the work — it belongs in Today until you
+// actually reach out. Marking them contacted drops them out, so the queue drains
+// as you work rather than sitting there like the old "cold" flood did.
+function isUncontactedLead(c) { return c.kind === 'lead' && !c.lastContactedAt; }
+function isActionable(c) { return c.needsReply || hasBlip(c) || isOverdue(c) || isDueToday(c) || isUncontactedLead(c); }
 
 function statusPillStyle(status, big) {
     const v = `var(--st-${status})`;
@@ -612,11 +620,13 @@ class ClientOS {
         const channelF = s.filters.filter((f) => f.startsWith('ch:')).map((f) => f.slice(3));
 
         const showArchived = metaF.includes('archived');
+        const includeLeads = s.filters.some((f) => ACTION_FILTERS.includes(f));
         let list = s.clients.filter((c) => {
             // Archived clients are hidden everywhere except the Archived chip.
             if (!!c.archived !== showArchived) return false;
-            // Leads never appear in the client list — they have their own Leads chip.
-            if (c.kind === 'lead') return false;
+            // Leads join any action queue (Today, Blip, Overdue…) because chasing
+            // them is the work; they're only held out of the plain browse list.
+            if (c.kind === 'lead' && !includeLeads) return false;
             if (statusF.length && !statusF.includes(c.status)) return false;
             if (channelF.length && !channelF.includes(c.channel)) return false;
             if (metaF.includes('today') && !isActionable(c)) return false;
@@ -646,9 +656,16 @@ class ClientOS {
     }
 
     renderCount(rows = this.visibleClients()) {
-        // Count clients only — leads are counted on the Leads chip.
-        const total = this.state.clients.filter((c) => !c.archived && c.kind !== 'lead').length;
-        this.dom.count.textContent = this.state.filters.length ? `${rows.length} of ${total}` : `${total} clients`;
+        // The denominator has to match what the current view can show, otherwise
+        // an action queue that includes leads reads as "12 of 41" against a pool
+        // that was never 41.
+        const includeLeads = this.state.filters.some((f) => ACTION_FILTERS.includes(f));
+        const total = this.state.clients
+            .filter((c) => !c.archived && (includeLeads || c.kind !== 'lead')).length;
+        if (!this.state.filters.length) { this.dom.count.textContent = `${total} clients`; return; }
+        const leadsShown = rows.filter((c) => c.kind === 'lead').length;
+        this.dom.count.textContent = `${rows.length} of ${total}`
+            + (leadsShown ? ` · ${leadsShown} lead${leadsShown === 1 ? '' : 's'}` : '');
     }
 
     renderChips() {
@@ -734,7 +751,16 @@ class ClientOS {
             h('span', { class: 'row-time', text: ago(c.lastContactedAt) }),
             this.igButton(c)
         ]);
-        const l2children = [this.statusPill(c.status), channelBadge(c.channel), ...pills];
+        // In a mixed queue (Today etc.) a lead has to be identifiable at a glance.
+        const l2children = [
+            c.kind === 'lead'
+                ? h('span', {
+                    class: 'pill lead-pill' + (isUncontactedLead(c) ? ' lead-new' : ''),
+                    text: isUncontactedLead(c) ? 'New lead' : 'Lead'
+                })
+                : null,
+            this.statusPill(c.status), channelBadge(c.channel), ...pills
+        ];
         if (c.hasActiveOrder) l2children.push(h('span', { class: 'pill in-progress-pill', text: 'In progress' }));
         if (c.orderCount) l2children.push(h('span', { class: 'pill order-pill', text: c.orderCount + '× · ' + moneyShort(c.revenue) }));
         if (hidden > 0) l2children.push(h('span', { class: 'row-more', text: '+' + hidden }));
@@ -767,7 +793,7 @@ class ClientOS {
                 h('div', { class: 'sub', text: !hasAny
                     ? 'Add your first client with the + button below.'
                     : (onlyToday
-                        ? 'No follow-ups due, no reply flags, no blips. Browse Cold to find someone worth reconnecting with.'
+                        ? 'Every lead has been reached out to, no follow-ups due, no reply flags, no blips. Browse Cold to find someone worth reconnecting with.'
                         : 'Nothing fits the current filters. Clear them, or add a client with +.') }),
                 onlyToday
                     ? h('button', { class: 'clear', onclick: () => { this.state.filters = ['cold']; this.render(); } }, 'Show cold clients')

@@ -304,6 +304,9 @@ body {
     color: var(--t3);
 }
 
+.pill.lead-pill { color: var(--st-Client); background: color-mix(in srgb, var(--st-Client) 16%, transparent); font-weight: 620; }
+/* never reached out to — the ones actually worth your time today */
+.pill.lead-pill.lead-new { color: var(--orange); background: color-mix(in srgb, var(--orange) 16%, transparent); }
 .pill.in-progress-pill { color: var(--red); background: color-mix(in srgb, var(--red) 14%, transparent); font-weight: 590; }
 .pill.order-pill { color: var(--t2); background: var(--elev2); font-variant-numeric: tabular-nums; }
 
