@@ -64,9 +64,10 @@ const CHIPS = [
     ['needsReply', 'Needs reply'],
     ['overdue', 'Overdue'],
     ['due', 'Due today'],
+    ['cold', 'Cold'],
     ...STATUSES.map((s) => [s, s])
 ];
-const META_FILTERS = ['today', 'blip', 'inprogress', 'needsReply', 'overdue', 'due'];
+const META_FILTERS = ['today', 'blip', 'inprogress', 'needsReply', 'overdue', 'due', 'cold'];
 
 function readPreference(key, fallback) {
     try { return localStorage.getItem(key) || fallback; } catch (error) { return fallback; }
@@ -243,7 +244,11 @@ function isCold(c) {
     if (!c.lastContactedAt) return true;
     return (Date.now() - c.lastContactedAt) > COLD_DAYS * DAY;
 }
-function isActionable(c) { return c.needsReply || hasBlip(c) || isOverdue(c) || isDueToday(c) || isCold(c); }
+// Today = what genuinely needs doing now. Deliberately NOT "cold" — every
+// imported client has an old or empty last-contacted date, so including cold
+// put 38 of 46 clients in here and made the queue meaningless. Cold lives on
+// its own chip for when you want to browse reconnect candidates.
+function isActionable(c) { return c.needsReply || hasBlip(c) || isOverdue(c) || isDueToday(c); }
 
 function statusPillStyle(status, big) {
     const v = `var(--st-${status})`;
@@ -600,6 +605,7 @@ class ClientOS {
             if (metaF.includes('today') && !isActionable(c)) return false;
             if (metaF.includes('blip') && !hasBlip(c)) return false;
             if (metaF.includes('inprogress') && !c.hasActiveOrder) return false;
+            if (metaF.includes('cold') && !isCold(c)) return false;
             if (metaF.includes('needsReply') && !c.needsReply) return false;
             if (metaF.includes('overdue') && !isOverdue(c)) return false;
             if (metaF.includes('due') && !isDueToday(c)) return false;
@@ -734,12 +740,20 @@ class ClientOS {
         const list = this.dom.list;
         list.textContent = '';
         if (rows.length === 0) {
+            const hasAny = this.state.clients.some((c) => !c.archived);
+            // An empty Today is the good outcome, not a dead end — say so, and
+            // offer the two lists you'd actually want next.
+            const onlyToday = hasAny && this.state.filters.length === 1 && this.state.filters[0] === 'today';
             list.appendChild(h('div', { class: 'empty' }, [
-                h('div', { class: 'title', text: this.state.clients.some((c) => !c.archived) ? 'No clients match' : 'No clients yet' }),
-                h('div', { class: 'sub', text: this.state.clients.some((c) => !c.archived)
-                    ? 'Nothing fits the current filters. Clear them, or add a client with +.'
-                    : 'Add your first client with the + button below.' }),
-                this.state.filters.length ? h('button', { class: 'clear', onclick: () => { this.state.filters = []; this.render(); } }, 'Clear filters') : null
+                h('div', { class: 'title', text: !hasAny ? 'No clients yet' : (onlyToday ? 'Nothing due today' : 'No clients match') }),
+                h('div', { class: 'sub', text: !hasAny
+                    ? 'Add your first client with the + button below.'
+                    : (onlyToday
+                        ? 'No follow-ups due, no reply flags, no blips. Browse Cold to find someone worth reconnecting with.'
+                        : 'Nothing fits the current filters. Clear them, or add a client with +.') }),
+                onlyToday
+                    ? h('button', { class: 'clear', onclick: () => { this.state.filters = ['cold']; this.render(); } }, 'Show cold clients')
+                    : (this.state.filters.length ? h('button', { class: 'clear', onclick: () => { this.state.filters = []; this.render(); } }, 'Clear filters') : null)
             ]));
             return;
         }
