@@ -263,10 +263,16 @@ function isCold(c) {
 // imported client has an old or empty last-contacted date, so including cold
 // put 38 of 46 clients in here and made the queue meaningless. Cold lives on
 // its own chip for when you want to browse reconnect candidates.
-// A lead nobody has contacted yet IS the work — it belongs in Today until you
-// actually reach out. Marking them contacted drops them out, so the queue drains
-// as you work rather than sitting there like the old "cold" flood did.
-function isUncontactedLead(c) { return c.kind === 'lead' && !c.lastContactedAt; }
+// A *freshly arrived* lead you haven't contacted belongs in Today. Gated on
+// arrival date on purpose: "never contacted" alone would park every historical
+// import in Today permanently, which is the same flood as the old cold rule.
+// New submissions surface for a few days, then fall back to the Leads chip.
+const NEW_LEAD_DAYS = 7;
+function isUncontactedLead(c) {
+    if (c.kind !== 'lead' || c.lastContactedAt) return false;
+    if (!c.createdAt) return false;
+    return (Date.now() - c.createdAt) <= NEW_LEAD_DAYS * DAY;
+}
 function isActionable(c) { return c.needsReply || hasBlip(c) || isOverdue(c) || isDueToday(c) || isUncontactedLead(c); }
 
 function statusPillStyle(status, big) {
