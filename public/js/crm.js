@@ -65,9 +65,10 @@ const CHIPS = [
     ['overdue', 'Overdue'],
     ['due', 'Due today'],
     ['cold', 'Cold'],
-    ...STATUSES.map((s) => [s, s])
+    ...STATUSES.map((s) => [s, s]),
+    ['archived', 'Archived']
 ];
-const META_FILTERS = ['today', 'blip', 'inprogress', 'needsReply', 'overdue', 'due', 'cold'];
+const META_FILTERS = ['today', 'blip', 'inprogress', 'needsReply', 'overdue', 'due', 'cold', 'archived'];
 
 function readPreference(key, fallback) {
     try { return localStorage.getItem(key) || fallback; } catch (error) { return fallback; }
@@ -121,6 +122,11 @@ function normalizeClient(c) {
         email: c.email || '',
         phone: c.phone || '',
         source: c.source || 'manual',
+        // Trial-campaign facts, mirrored onto the client (server-projected).
+        trial: c.trial || null,
+        trialKey: c.trialKey || '',
+        youtubeLink: c.youtubeLink || '',
+        youtubeThumbnailUrl: c.youtubeThumbnailUrl || '',
         // Orders + rollups ride along on the client record (server-projected).
         orders: c.orders || {},
         orderCount: Number(c.orderCount || 0),
@@ -526,9 +532,11 @@ class ClientOS {
     /* ---- trial leads (separate node, shown read-mostly) ---- */
     visibleLeads() {
         const q = this.state.query.trim().toLowerCase();
-        const statusF = this.state.filters.filter((f) => LEAD_STATUSES.includes(f.replace('lead:', '')) && f.startsWith('lead:')).map((f) => f.slice(5));
+        // Anything already mirrored into a client shows as that client instead, so
+        // it never appears twice.
+        const mirrored = new Set(this.state.clients.map((c) => c.trialKey).filter(Boolean));
         return (this.state.leads || [])
-            .filter((l) => !statusF.length || statusF.includes(l.status))
+            .filter((l) => !mirrored.has(l.id))
             .filter((l) => !q || l.name.toLowerCase().includes(q) || l.genre.toLowerCase().includes(q) || l.instagram.toLowerCase().includes(q))
             .sort((a, b) => b.at - a.at);
     }
@@ -539,7 +547,9 @@ class ClientOS {
     leadClients() {
         const q = this.state.query.trim().toLowerCase();
         return this.state.clients
-            .filter((c) => !c.archived && c.status === 'Lead')
+            // Lead-status clients plus anything that came in from a trial campaign,
+            // whatever status it has now.
+            .filter((c) => !c.archived && (c.status === 'Lead' || c.source === 'trial'))
             .filter((c) => !q || clientTitle(c).toLowerCase().includes(q) || c.niche.toLowerCase().includes(q) || c.note.toLowerCase().includes(q))
             .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     }
@@ -598,8 +608,10 @@ class ClientOS {
         const metaF = s.filters.filter((f) => META_FILTERS.includes(f));
         const channelF = s.filters.filter((f) => f.startsWith('ch:')).map((f) => f.slice(3));
 
+        const showArchived = metaF.includes('archived');
         let list = s.clients.filter((c) => {
-            if (c.archived) return false;
+            // Archived clients are hidden everywhere except the Archived chip.
+            if (!!c.archived !== showArchived) return false;
             if (statusF.length && !statusF.includes(c.status)) return false;
             if (channelF.length && !channelF.includes(c.channel)) return false;
             if (metaF.includes('today') && !isActionable(c)) return false;
@@ -872,7 +884,9 @@ class ClientOS {
             qa(ICONS.check, 'Contacted', null, () => this.patch(c.id, { lastContactedAt: Date.now(), needsReply: false, history: this.withHistory(c, 'Marked contacted') }, { toast: 'Marked contacted' })),
             qa(ICONS.bell, 'Remind', null, () => this.openReminder()),
             qa(ICONS.pencil, 'Edit', null, () => this.openForm(c.id)),
-            qa(ICONS.archive, 'Archive', null, () => this.archive(c))
+            c.archived
+                ? qa(ICONS.archive, 'Restore', null, () => this.unarchive(c))
+                : qa(ICONS.archive, 'Archive', null, () => this.archive(c))
         ]));
 
         // follow-up row
@@ -886,6 +900,30 @@ class ClientOS {
             h('span', { class: 'label', text: 'Follow-up' }),
             h('div', { class: 'fu-value-wrap' }, fuValue)
         ]));
+
+        // trial campaign — the video they submitted, plus its current trial label
+        if (c.trial) {
+            const t = c.trial;
+            const gained = (t.viewsStart != null && t.viewsEnd != null)
+                ? '+' + Math.max(0, t.viewsEnd - t.viewsStart).toLocaleString() + ' views'
+                : '';
+            body.appendChild(h('div', { class: 'followup-row', style: 'cursor:default' }, [
+                h('span', { class: 'label', text: 'Trial' }),
+                h('div', { class: 'fu-value-wrap' }, [
+                    h('span', { class: 'value', text: LEAD_LABEL[t.leadStatus] || 'New' }),
+                    h('span', { class: 'sub', text: [t.genre, t.subgenre, gained].filter(Boolean).join(' · ') })
+                ])
+            ]));
+            if (c.youtubeLink) {
+                body.appendChild(h('a', {
+                    class: 'order-live-row', href: c.youtubeLink, target: '_blank', rel: 'noopener noreferrer',
+                    style: 'text-decoration:none'
+                }, [
+                    h('span', { class: 'label', text: 'Their video' }),
+                    h('span', { class: 'sub', text: 'open ↗' })
+                ]));
+            }
+        }
 
         // orders — the client record carries them; keep it a quick glance here
         // (full editing lives in the admin).
@@ -989,9 +1027,14 @@ class ClientOS {
     archive(c) {
         this.closeOverlay();
         this.patch(c.id, { archived: true }, {
-            toast: 'Archived @' + c.handle,
+            toast: 'Archived ' + clientTitle(c) + ' — find them under Archived',
             undo: () => this.patch(c.id, { archived: false })
         });
+    }
+
+    unarchive(c) {
+        this.closeOverlay();
+        this.patch(c.id, { archived: false }, { toast: 'Restored ' + clientTitle(c) });
     }
 
     /* ---- reminder ---- */

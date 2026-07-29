@@ -116,6 +116,52 @@ export default async function handler(req, res) {
         const trialCampaignRef = database.ref('trialCampaignSubmissions');
         const newSubmissionRef = await trialCampaignRef.push(submissionData);
 
+        // Mirror the submission into the shared client book as a Lead, so it shows
+        // up (and is editable) in the CRM straight away with its YouTube info.
+        // Keyed by submissionId so a retry can never create a duplicate.
+        try {
+            const claim = await database.ref(`crm/clientTrialIndex/${submissionId}`)
+                .transaction((cur) => (cur && cur.clientKey ? undefined : { pending: true }));
+            if (claim.committed) {
+                const clientRef = database.ref('crm/clients').push();
+                await clientRef.set({
+                    handle: '', handleKey: '',
+                    name: fullName,
+                    slug: '',
+                    email: '', emailKey: '', phone: '', phoneKey: '',
+                    niche: genre || '',
+                    channel: '',
+                    status: 'Lead',
+                    activity: 'neutral',
+                    urgent: false,
+                    needsReply: false,
+                    note: '',
+                    highlights: [],
+                    history: [{ at: Date.now(), text: 'Trial campaign submission' }],
+                    followUpAt: null, followUpHasTime: false,
+                    lastContactedAt: null,
+                    source: 'trial',
+                    trialKey: newSubmissionRef.key,
+                    trialSubmissionId: submissionId,
+                    youtubeLink,
+                    youtubeVideoId,
+                    youtubeThumbnailUrl,
+                    trial: {
+                        submissionId, genre, subgenre, yearsMakingMusic,
+                        targetRegions, targetAgeGroup, leadStatus: 'new'
+                    },
+                    archived: false,
+                    createdAt: admin.database.ServerValue.TIMESTAMP,
+                    updatedAt: admin.database.ServerValue.TIMESTAMP,
+                    createdBy: 'trial-campaign', updatedBy: 'trial-campaign'
+                });
+                await database.ref(`crm/clientTrialIndex/${submissionId}`).set({ clientKey: clientRef.key });
+            }
+        } catch (crmErr) {
+            // Never fail the submission because the CRM mirror hiccuped.
+            console.error('Trial → CRM client mirror failed (submission still saved):', crmErr.message);
+        }
+
         console.log('Trial campaign stored successfully:', {
             firebaseKey: newSubmissionRef.key,
             submissionId,

@@ -245,12 +245,37 @@ async function handleGet(database, res) {
     ]);
 
     const projections = buildProjections(ordersSnap);
+
+    // Trial submissions are mirrored into the client book; keep the trial-side
+    // facts (label, YouTube, genre) fresh on the client without the CRM having to
+    // read a second node. One-way: the submission owns these fields.
+    const trialByKey = {};
+    if (leadsSnap.exists()) leadsSnap.forEach((child) => { trialByKey[child.key] = child.val() || {}; });
+
     const repair = {};
 
     const clients = snapshotToArray(clientsSnap).map((c) => {
         const p = projections[c.firebaseKey] || { orders: {}, orderCount: 0, revenue: 0, lastOrderAt: 0, hasActiveOrder: false };
+        const t = c.trialKey ? trialByKey[c.trialKey] : null;
+        const trialLive = t ? {
+            youtubeLink: t.youtubeLink || c.youtubeLink || '',
+            youtubeVideoId: t.youtubeVideoId || c.youtubeVideoId || '',
+            youtubeThumbnailUrl: t.youtubeThumbnailUrl || c.youtubeThumbnailUrl || '',
+            trial: {
+                submissionId: t.submissionId || '',
+                genre: t.genre || '', subgenre: t.subgenre || '',
+                yearsMakingMusic: t.yearsMakingMusic || '',
+                targetRegions: t.targetRegions || '', targetAgeGroup: t.targetAgeGroup || '',
+                leadStatus: t.leadStatus === 'qualified' ? 'completed' : (t.leadStatus || 'new'),
+                viewsStart: t.viewsStart == null ? null : Number(t.viewsStart),
+                viewsEnd: t.viewsEnd == null ? null : Number(t.viewsEnd),
+                adminNotes: t.adminNotes || ''
+            }
+        } : {};
+
         const merged = {
             ...c,
+            ...trialLive,
             orders: p.orders,
             orderCount: p.orderCount,
             revenue: p.revenue,
